@@ -1,0 +1,9 @@
+-r requirements.txt
+pytest>=8.2
+pytest-asyncio>=0.23
+pytest-cov>=5.0
+locust>=2.28
+schemathesis>=3.29
+pre-commit>=3.7
+ruff>=0.4
+pip-audit>=2.7

@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+WORKDIR /app
+# Install only the minimal runtime needed for the demo (gradio + httpx)
+RUN apt-get update && apt-get install -y gcc libpq-dev curl && \
+    pip install --no-cache-dir gradio httpx && \
+    apt-get remove -y gcc && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+COPY app.py app.py
+ENV PYTHONPATH=/app
+EXPOSE 7860
+CMD ["python","app.py"]

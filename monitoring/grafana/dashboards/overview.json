@@ -1,0 +1,20 @@
+{
+  "title": "MLOps Overview",
+  "uid": "mlops-overview",
+  "panels": [
+    {"type": "timeseries", "title": "Predictions/sec",
+     "targets": [{"expr": "rate(predictions_total[1m])"}]},
+    {"type": "timeseries", "title": "p99 Latency (ms)",
+     "targets": [{"expr": "histogram_quantile(0.99, prediction_latency_seconds_bucket)*1000"}]},
+    {"type": "gauge",      "title": "Fraud Detection Rate",
+     "targets": [{"expr": "rate(predictions_total{decision='REJECT'}[5m]) / rate(predictions_total[5m])"}]},
+    {"type": "timeseries", "title": "Dataset Drift Score",
+     "targets": [{"expr": "evidently_drift_score"}]},
+    {"type": "timeseries", "title": "Model AUC",
+     "targets": [{"expr": "model_auc_roc"}]},
+    {"type": "stat",       "title": "Kafka Consumer Lag",
+     "targets": [{"expr": "kafka_consumer_lag"}]}
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}

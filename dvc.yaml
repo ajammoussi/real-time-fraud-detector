@@ -1,0 +1,30 @@
+stages:
+  validate:
+    cmd: bash scripts/pipeline_gate.sh
+    deps:
+      - scripts/pipeline_gate.sh
+      - scripts/ingestion_ctl.py
+      - gx/validate.py
+      - gx/expectations/fraud_transactions_suite.json
+
+  train:
+    cmd: python training/train.py
+    deps:
+      - training/train.py
+      - training/feature_engineering.py
+      - params.yaml
+    params:
+      - params.yaml:
+          - model.n_trials
+          - model.n_estimators_min
+          - model.n_estimators_max
+          - model.max_depth_max
+          - model.learning_rate_min
+          - model.learning_rate_max
+          - model.max_files
+          - model.max_rows
+          - lake_batch_size
+          - lake_batch_timeout_secs
+    metrics:
+      - metrics.json:
+          cache: false

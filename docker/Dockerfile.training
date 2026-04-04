@@ -1,0 +1,22 @@
+# ── Build stage ──────────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+WORKDIR /build
+COPY requirements-training.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir --prefix=/install -r requirements-training.txt
+
+# ── Runtime stage ─────────────────────────────────────────────────────────
+FROM python:3.11-slim
+WORKDIR /app
+COPY --from=builder /install /usr/local
+COPY training/ training/
+COPY scripts/ scripts/
+COPY config/ config/
+COPY db/ db/
+COPY feast/ feast/
+COPY gx/ gx/
+COPY params.yaml .
+COPY alembic.ini .
+COPY alembic/ alembic/
+ENV PYTHONPATH=/app
+CMD ["python", "training/train.py"]

@@ -1,0 +1,65 @@
+name: Train & Promote
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "training/**"
+      - "scripts/**"
+      - "dvc.yaml"
+      - "params.yaml"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Trigger reason"
+        required: false
+        default: "manual"
+
+env:
+  MLFLOW_TRACKING_URI:   ${{ secrets.MLFLOW_TRACKING_URI }}
+  SEAWEED_ACCESS_KEY:    ${{ secrets.SEAWEED_ACCESS_KEY }}
+  SEAWEED_SECRET_KEY:    ${{ secrets.SEAWEED_SECRET_KEY }}
+  SEAWEED_ENDPOINT:      ${{ secrets.SEAWEED_ENDPOINT }}
+  DATALAKE_BUCKET:       ${{ secrets.DATALAKE_BUCKET }}
+  POSTGRES_HOST:         ${{ secrets.POSTGRES_HOST }}
+  POSTGRES_PASSWORD:     ${{ secrets.POSTGRES_PASSWORD }}
+  REDIS_HOST:            ${{ secrets.REDIS_HOST }}
+  KAFKA_BOOTSTRAP_SERVERS: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+
+jobs:
+  # ── Gate: check the lake has data; seed if first run ─────────────────────
+  # The lake is populated continuously by binance-producer + lake-consumer.
+  # This step verifies it is ready — it does NOT generate or fetch new data.
+  lake-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements.txt
+      - name: Check lake and seed if empty
+        run: bash scripts/pipeline_gate.sh
+        env:
+          MIN_RAW_FILES: "1"
+          SEED_IF_EMPTY: "true"   # bootstrap only on first-ever run
+
+  # ── Train on whatever Parquet files are in raw/ ───────────────────────
+  train:
+    needs: lake-readiness
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.train.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements-dev.txt
+      - name: Train model
+        id: train
+        run: |
+          RUN_ID=$(python training/train.py | grep "Run ID:" | awk '{print $NF}')
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+      - name: Run model quality gates
+        run: pytest tests/model -v
+      - name: Promote to Staging
+        run: python scripts/model_ctl.py promote ${{ steps.train.outputs.run_id }} --stage Staging

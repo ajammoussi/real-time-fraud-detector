@@ -1,0 +1,17 @@
+seed: 42
+n_rows: 100000
+fraud_rate: 0.02
+
+# Streaming ingestion batch params
+lake_batch_size: 1000
+lake_batch_timeout_secs: 300
+
+model:
+  n_trials: 24
+  n_estimators_min: 150
+  n_estimators_max: 400
+  max_depth_max: 8
+  learning_rate_min: 0.005
+  learning_rate_max: 0.2
+  max_files: 20
+  max_rows: 250000

@@ -1,0 +1,62 @@
+name: Auto Retrain
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Alert that triggered retrain (e.g. FraudDriftHigh, ModelAUCLow)"
+        required: true
+        default: "FraudDriftHigh"
+
+concurrency:
+  group: auto-retrain
+  cancel-in-progress: false
+
+env:
+  MLFLOW_TRACKING_URI:   ${{ secrets.MLFLOW_TRACKING_URI }}
+  SEAWEED_ACCESS_KEY:    ${{ secrets.SEAWEED_ACCESS_KEY }}
+  SEAWEED_SECRET_KEY:    ${{ secrets.SEAWEED_SECRET_KEY }}
+  SEAWEED_ENDPOINT:      ${{ secrets.SEAWEED_ENDPOINT }}
+  DATALAKE_BUCKET:       ${{ secrets.DATALAKE_BUCKET }}
+  POSTGRES_HOST:         ${{ secrets.POSTGRES_HOST }}
+  POSTGRES_PASSWORD:     ${{ secrets.POSTGRES_PASSWORD }}
+  REDIS_HOST:            ${{ secrets.REDIS_HOST }}
+  KAFKA_BOOTSTRAP_SERVERS: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.train.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements-dev.txt
+
+      # The lake is continuously fed by binance-producer + lake-consumer in prod.
+      # No data generation step needed — we just verify the lake is non-empty
+      # and materialise fresh Feast features before training.
+      - name: Verify lake readiness & refresh Feast features
+        run: bash scripts/pipeline_gate.sh
+        env:
+          MIN_RAW_FILES: "5"
+          SEED_IF_EMPTY: "false"  # If lake is empty during retrain, that's an error
+
+      - name: Retrain model on latest lake data
+        id: train
+        run: |
+          echo "Retrain triggered by: ${{ github.event.inputs.reason || 'scheduled' }}"
+          RUN_ID=$(python training/train.py | grep "Run ID:" | awk '{print $NF}')
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run model quality gates
+        run: pytest tests/model -v
+
+      # Auto-promote directly to Production on retrain
+      # (Staging → Production gate is skipped because the alert already
+      #  confirms the current Production model is degraded)
+      - name: Promote directly to Production
+        run: python scripts/model_ctl.py promote ${{ steps.train.outputs.run_id }} --stage Production

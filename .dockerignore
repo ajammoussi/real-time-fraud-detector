@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+mlruns/
+.dvc/cache
+data/raw/
+data/validated/
+data/features/
+.env
+.env.local
+*.parquet
+/tmp/
+*.egg-info/
+dist/
+build/
+
+# Docker
+Dockerfile*
+docker-compose.yml
+.dockerignore

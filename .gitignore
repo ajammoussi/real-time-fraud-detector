@@ -1,0 +1,15 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+data/raw/
+data/validated/
+data/features/
+mlruns/
+.dvc/tmp/
+*.parquet
+/tmp/

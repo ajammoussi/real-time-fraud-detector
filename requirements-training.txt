@@ -1,0 +1,41 @@
+# Full ML training pipeline
+scikit-learn>=1.4
+xgboost>=2.0
+optuna>=3.6
+pandas>=2.2
+numpy>=1.26
+pyarrow>=15.0
+
+# Data validation
+great_expectations>=0.18
+
+# ML Orchestration
+mlflow>=2.13
+
+# Feature store
+feast[redis]>=0.38
+
+# Data lake (S3-compatible)
+s3fs>=2024.3
+boto3>=1.34
+
+# Database
+psycopg2-binary>=2.9
+sqlalchemy>=2.0
+
+# Model testing
+deepchecks>=0.18
+
+# Monitoring
+prometheus-client>=0.20
+redis>=4.2.2,<5  # feast[redis] requires redis<5
+
+# Config
+pydantic>=2.7
+pydantic-settings>=2.3
+python-dotenv>=1.0
+
+# Utils
+structlog>=24.1
+httpx>=0.27
+typer>=0.12

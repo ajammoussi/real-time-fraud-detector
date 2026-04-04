@@ -1,0 +1,37 @@
+# FastAPI + Kafka consumer + model serving
+fastapi>=0.111
+uvicorn[standard]>=0.29
+pydantic>=2.7
+pydantic-settings>=2.3
+python-dotenv>=1.0
+
+# Database & ORM
+psycopg2-binary>=2.9
+sqlalchemy>=2.0
+
+# Messaging & Streaming
+kafka-python>=2.0
+
+# Model Loading & Inference
+scikit-learn>=1.4
+xgboost>=2.0
+s3fs>=2024.3
+boto3>=1.34
+pyarrow>=15.0
+pandas>=2.2
+
+# Feature Engineering (for predict endpoint)
+numpy>=1.26
+feast[redis]>=0.38
+
+# Monitoring & Metrics
+prometheus-client>=0.20
+redis>=4.2.2,<5  # feast[redis] requires redis<5 (if using Feast)
+
+# MLflow (for model loading from registry)
+mlflow>=2.13
+
+# Utils
+httpx>=0.27
+structlog>=24.1
+typer>=0.12

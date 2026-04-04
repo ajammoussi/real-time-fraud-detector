@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pip-audit -r requirements.txt
+      - run: pytest tests/unit -v --cov=. --cov-report=xml
+      - uses: codecov/codecov-action@v4
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f docker/Dockerfile.api -t fraud-api:ci .
+      - run: docker run --rm fraud-api:ci python -c "import api; print('OK')"

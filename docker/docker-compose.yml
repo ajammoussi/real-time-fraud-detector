@@ -1,0 +1,215 @@
+# Enable Docker BuildKit for better caching:
+#   export DOCKER_BUILDKIT=1
+
+name: real-time-fraud-detection
+
+services:
+  # ── Data Lake ──────────────────────────────────────────────────────────
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:3.65
+    command: master -ip=seaweedfs-master -port=9333
+    ports: ["9333:9333"]
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:3.65
+    command: volume -mserver=seaweedfs-master:9333 -port=8080 -dir=/data
+    volumes: ["seaweedfs-data:/data"]
+    ports: ["8080:8080"]
+    depends_on: [seaweedfs-master]
+
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs:3.65
+    command: filer -master=seaweedfs-master:9333 -port=8888
+    depends_on: [seaweedfs-master]
+    ports: ["8888:8888"]
+
+  seaweedfs-s3:
+    image: chrislusf/seaweedfs:3.65
+    command: s3 -port=8333 -ip.bind=0.0.0.0 -filer=seaweedfs-filer:8888
+    ports: ["8333:8333"]
+    depends_on: [seaweedfs-filer]
+
+  # ── Storage ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mlops
+      POSTGRES_USER: mlops
+      POSTGRES_PASSWORD: mlops_secret
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlops -d mlops"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  # ── Kafka ──────────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment: {ZOOKEEPER_CLIENT_PORT: 2181}
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on: [zookeeper]
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  # ── MLflow ─────────────────────────────────────────────────────────────
+  mlflow-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.training
+    env_file: [../.env]
+    command: >
+      sh -c "exec mlflow server
+      --backend-store-uri $$MLFLOW_BACKEND_STORE_URI
+      --default-artifact-root s3://datalake/models/
+      --host 0.0.0.0 --port 5000"
+    ports: ["5000:5000"]
+    restart: always
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://mlops:mlops_secret@postgres/mlflow
+      MLFLOW_S3_ENDPOINT_URL: http://seaweedfs-s3:8333
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs-s3:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 5000)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # ── Ingestion: Binance WebSocket → Kafka producer ─────────────────────
+  # Connects to wss://stream.binance.com:9443/stream (public, no auth).
+  # Publishes one JSON record per trade to `transactions_raw`.
+  # Restart policy: always — it reconnects on WebSocket drops automatically.
+  binance-producer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    command: python kafka/producer.py
+    env_file: [../.env]
+    restart: always
+    depends_on: [kafka]
+    environment:
+      BINANCE_WS_BASE: wss://stream.binance.com:9443/stream
+      BINANCE_SYMBOLS: btcusdt,ethusdt,bnbusdt,solusdt,xrpusdt
+
+  # ── Ingestion: Kafka → SeaweedFS lake writer ───────────────────────────
+  # Reads `transactions_raw`, batches messages, validates with GX,
+  # and writes Parquet files to s3://datalake/raw/.
+  # Consumer group `lake-writers` (independent from prediction-workers).
+  lake-consumer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    command: python kafka/lake_consumer.py
+    env_file: [../.env]
+    restart: always
+    depends_on:
+      kafka:
+        condition: service_started
+      seaweedfs-s3:
+        condition: service_started
+    environment:
+      LAKE_BATCH_SIZE: 1000
+      LAKE_BATCH_TIMEOUT_SECS: 300
+
+  # ── API + prediction consumer ──────────────────────────────────────────
+  fraud-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    ports: ["8000:8000"]
+    env_file: [../.env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+      mlflow-server:
+        condition: service_healthy
+      seaweedfs-s3:
+        condition: service_started
+
+  # Reads `transactions_raw` (group: prediction-workers) — independent offset
+  # from lake-consumer. Scores each record and persists to PostgreSQL.
+  kafka-consumer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    command: python kafka/consumer.py
+    env_file: [../.env]
+    restart: always
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      mlflow-server:
+        condition: service_healthy
+
+  # ── Monitoring ─────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ../monitoring/prometheus:/etc/prometheus
+    ports: ["9090:9090"]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    volumes:
+      - ../monitoring/alertmanager:/etc/alertmanager
+    ports: ["9093:9093"]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on: [prometheus]
+
+  alert-webhook:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.monitoring
+    ports: ["8001:8001"]
+    env_file: [../.env]
+
+  # ── Interactive demo (Gradio) ─────────────────────────────────────────
+  gradio-demo:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gradio
+    ports: ["7860:7860"]
+    env_file: [../.env]
+    environment:
+      - FRAUD_API_URL=http://fraud-api:8000
+    restart: unless-stopped
+
+volumes:
+  seaweedfs-data:
+  pgdata:
+  grafana-data:
