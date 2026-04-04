@@ -7,7 +7,7 @@ COMPOSE_FILE=docker/docker-compose.yml
 COMPOSE=docker compose -f $(COMPOSE_FILE)
 
 setup:
-	pip install -r requirements-dev.txt
+	pip install -r requirements/dev.txt
 	pre-commit install
 
 ensure-mlflow-db:

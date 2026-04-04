@@ -1,9 +1,9 @@
 # ── Build stage ──────────────────────────────────────────────────────────
 FROM python:3.11-slim AS builder
 WORKDIR /build
-COPY requirements-monitoring.txt .
+COPY requirements/monitoring.txt requirements/monitoring.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --prefix=/install -r requirements-monitoring.txt
+    pip install --no-cache-dir --prefix=/install -r requirements/monitoring.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────
 FROM python:3.11-slim

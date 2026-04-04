@@ -632,7 +632,7 @@ real-time-fraud-detector/
 ├── dvc.yaml                      # DVC pipeline stages
 ├── params.yaml                   # Hyperparameter config
 ├── requirements.txt              # Production dependencies
-├── requirements-dev.txt          # Development + testing deps
+├── requirements/dev.txt          # Development + testing deps
 ├── pyproject.toml                # Python project metadata
 ├── Makefile                      # Automation commands
 ├── .env.example                  # Environment template
