@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from mlflow.exceptions import MlflowException
 from sklearn.metrics import f1_score, roc_auc_score
 
 from api.model_loader import load_model
@@ -37,7 +38,10 @@ def val_data():
 
 @pytest.fixture(scope="module")
 def model():
-    return load_model("Staging")
+    try:
+        return load_model("Staging")
+    except MlflowException:
+        pytest.skip("No model registered in MLflow 'Staging' for model quality tests")
 
 
 def test_auc_roc_above_threshold(model, val_data):
