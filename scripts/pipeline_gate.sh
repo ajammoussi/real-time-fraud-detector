@@ -32,18 +32,44 @@ if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
 fi
 
 echo "=== [1/3] Checking lake readiness ==="
+echo "MIN_RAW_FILES=${MIN_RAW_FILES}"
+echo "SEED_IF_EMPTY=${SEED_IF_EMPTY}"
+echo "DATALAKE_BUCKET=${DATALAKE_BUCKET:-unset}"
+echo "SEAWEED_ENDPOINT=${SEAWEED_ENDPOINT:-unset}"
+if [ -z "${SEAWEED_ACCESS_KEY:-}" ] || [ -z "${SEAWEED_SECRET_KEY:-}" ]; then
+  echo "WARNING: SEAWEED access/secret keys are not set in the environment (will use defaults if present)."
+else
+  echo "SEAWEED credentials: present"
+fi
+
+# Run status but do not let 'set -e' abort the script so we can print diagnostics
+set +e
 STATUS=$($PYTHON_BIN scripts/ingestion_ctl.py status 2>&1)
+STATUS_RC=$?
+set -e
+
 echo "$STATUS"
 
-RAW_FILES=$(echo "$STATUS" | $PYTHON_BIN -c "import sys,json; d=json.loads(sys.stdin.read()); print(d['lake_raw_files'])" 2>/dev/null || echo "0")
+if [ $STATUS_RC -ne 0 ]; then
+  echo "::error::Failed to query datalake status (exit ${STATUS_RC})." >&2
+  echo "::error::Check SEAWEED_ENDPOINT, DATALAKE_BUCKET and credentials in the workflow secrets or environment." >&2
+  echo "$STATUS" >&2
+  exit $STATUS_RC
+fi
+
+RAW_FILES=$(echo "$STATUS" | $PYTHON_BIN -c "import sys,json; d=json.loads(sys.stdin.read()); print(d.get('lake_raw_files',0))" 2>/dev/null || echo "0")
+
+if ! echo "$RAW_FILES" | grep -E '^[0-9]+$' >/dev/null 2>&1; then
+  echo "::error::Unexpected RAW_FILES value: $RAW_FILES" >&2
+  exit 1
+fi
 
 if [ "$RAW_FILES" -lt "$MIN_RAW_FILES" ]; then
   if [ "$SEED_IF_EMPTY" = "true" ]; then
     echo "=== Lake has $RAW_FILES files (< $MIN_RAW_FILES required) — writing seed data ==="
     $PYTHON_BIN scripts/ingestion_ctl.py seed --n-rows 50000 --fraud-rate 0.02
   else
-    echo "ERROR: Lake has $RAW_FILES raw files, need >= $MIN_RAW_FILES. " \
-         "Start kafka/producer.py + kafka/lake_consumer.py to populate the lake." >&2
+    echo "::error::Lake not ready: found $RAW_FILES files, need >= $MIN_RAW_FILES. Start producers/consumers or set SEED_IF_EMPTY=true for automatic bootstrap." >&2
     exit 1
   fi
 else
@@ -51,24 +77,44 @@ else
 fi
 
 echo "=== [2/3] Running Great Expectations on latest raw batch ==="
+echo "DEBUG: SEAWEED_ENDPOINT=${SEAWEED_ENDPOINT:-unset} DATALAKE_BUCKET=${DATALAKE_BUCKET:-unset}"
 # Find most recent raw parquet and validate it
-LATEST=$($PYTHON_BIN -c "
-import boto3, os
+set +e
+LATEST=$($PYTHON_BIN - <<'PY'
+import boto3, os, sys
 cfg_ep  = os.environ.get('SEAWEED_ENDPOINT', 'http://localhost:8333')
 cfg_ak  = os.environ.get('SEAWEED_ACCESS_KEY', 'minioadmin')
 cfg_sk  = os.environ.get('SEAWEED_SECRET_KEY', 'minioadmin')
 bucket  = os.environ.get('DATALAKE_BUCKET', 'datalake')
-s3 = boto3.client('s3', endpoint_url=cfg_ep,
-                  aws_access_key_id=cfg_ak, aws_secret_access_key=cfg_sk)
-objs = s3.list_objects_v2(Bucket=bucket, Prefix='raw/')
-files = sorted(
-    [o for o in objs.get('Contents', []) if o['Key'].endswith('.parquet')],
-    key=lambda x: x['LastModified'], reverse=True
+try:
+    import boto3
+    print("boto3_version:" + boto3.__version__)
+    s3 = boto3.client('s3', endpoint_url=cfg_ep,
+                      aws_access_key_id=cfg_ak, aws_secret_access_key=cfg_sk)
+    objs = s3.list_objects_v2(Bucket=bucket, Prefix='raw/')
+    files = sorted(
+        [o for o in objs.get('Contents', []) if o['Key'].endswith('.parquet')],
+        key=lambda x: x['LastModified'], reverse=True
+    )
+    if files:
+        print(f"s3://{bucket}/{files[0]['Key']}")
+    else:
+        print("")
+except Exception as e:
+    print("ERROR:" + str(e))
+    sys.exit(2)
+PY
 )
-print(f\"s3://{bucket}/{files[0]['Key']}\" if files else '')
-" 2>/dev/null)
+PY_RC=$?
+set -e
 
-if [ -n "$LATEST" ]; then
+if [ $PY_RC -ne 0 ]; then
+  echo "::warning::Could not enumerate parquet files (exit $PY_RC)." >&2
+  echo "$LATEST" >&2
+  LATEST=""
+fi
+
+if [ -n "$LATEST" ] && ! echo "$LATEST" | grep -q '^ERROR:'; then
   $PYTHON_BIN gx/validate.py "$LATEST" && echo "GX validation passed: $LATEST"
 else
   echo "WARNING: No parquet files found for GX validation — skipping."

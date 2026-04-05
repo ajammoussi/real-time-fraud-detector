@@ -28,6 +28,28 @@ env:
 jobs:
   retrain:
     runs-on: ubuntu-latest
+    env:
+      SEAWEED_ENDPOINT: ${{ secrets.SEAWEED_ENDPOINT || 'http://localhost:9000' }}
+      SEAWEED_ACCESS_KEY: ${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}
+      SEAWEED_SECRET_KEY: ${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}
+      DATALAKE_BUCKET: ${{ secrets.DATALAKE_BUCKET || 'datalake' }}
+      MINIO_ROOT_USER: ${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}
+    services:
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: ${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}
+        ports:
+          - 9000:9000
+          - 9001:9001
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+        command: server /data --console-address :9001
     outputs:
       run_id: ${{ steps.train.outputs.run_id }}
     steps:
@@ -36,9 +58,21 @@ jobs:
         with: {python-version: "3.11"}
       - run: pip install -r requirements/dev.txt
 
+      - name: Wait for local S3 and create bucket
+        run: python scripts/wait_for_s3.py --timeout 60 --create-bucket
+
       # The lake is continuously fed by binance-producer + lake-consumer in prod.
       # No data generation step needed — we just verify the lake is non-empty
       # and materialise fresh Feast features before training.
+      - name: Preflight: required secrets present
+        run: |
+          test -n "${DATALAKE_BUCKET}" || (echo "::error::Missing DATALAKE_BUCKET" && exit 1)
+          test -n "${SEAWEED_ENDPOINT}" || (echo "::error::Missing SEAWEED_ENDPOINT" && exit 1)
+          test -n "${SEAWEED_ACCESS_KEY}" || echo "::warning::SEAWEED_ACCESS_KEY not set"
+          test -n "${SEAWEED_SECRET_KEY}" || echo "::warning::SEAWEED_SECRET_KEY not set"
+          test -n "${MINIO_ROOT_USER}" || (echo "::error::Missing CI_MINIO_ROOT_USER secret (set in repository secrets)" && exit 1)
+          test -n "${MINIO_ROOT_PASSWORD}" || (echo "::error::Missing CI_MINIO_ROOT_PASSWORD secret (set in repository secrets)" && exit 1)
+
       - name: Verify lake readiness & refresh Feast features
         run: bash scripts/pipeline_gate.sh
         env:

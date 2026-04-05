@@ -27,26 +27,30 @@ env:
   KAFKA_BOOTSTRAP_SERVERS: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
 
 jobs:
-  # ── Gate: check the lake has data; seed if first run ─────────────────────
-  # The lake is populated continuously by binance-producer + lake-consumer.
-  # This step verifies it is ready — it does NOT generate or fetch new data.
-  lake-readiness:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - run: pip install -r requirements.txt
-      - name: Check lake and seed if empty
-        run: bash scripts/pipeline_gate.sh
-        env:
-          MIN_RAW_FILES: "1"
-          SEED_IF_EMPTY: "true"   # bootstrap only on first-ever run
-
-  # ── Train on whatever Parquet files are in raw/ ───────────────────────
   train:
-    needs: lake-readiness
     runs-on: ubuntu-latest
+    env:
+      SEAWEED_ENDPOINT: ${{ secrets.SEAWEED_ENDPOINT || 'http://localhost:9000' }}
+      SEAWEED_ACCESS_KEY: ${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}
+      SEAWEED_SECRET_KEY: ${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}
+      DATALAKE_BUCKET: ${{ secrets.DATALAKE_BUCKET || 'datalake' }}
+      MINIO_ROOT_USER: ${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}
+    services:
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: ${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}
+        ports:
+          - 9000:9000
+          - 9001:9001
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+        command: server /data --console-address :9001
     outputs:
       run_id: ${{ steps.train.outputs.run_id }}
     steps:
@@ -54,6 +58,23 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - run: pip install -r requirements/dev.txt
+
+      - name: Wait for local S3 and create bucket
+        run: python scripts/wait_for_s3.py --timeout 60 --create-bucket
+
+      - name: Preflight: required secrets present
+        run: |
+          test -n "${DATALAKE_BUCKET}" || (echo "::error::Missing DATALAKE_BUCKET" && exit 1)
+          test -n "${SEAWEED_ENDPOINT}" || (echo "::error::Missing SEAWEED_ENDPOINT" && exit 1)
+          test -n "${MINIO_ROOT_USER}" || (echo "::error::Missing CI_MINIO_ROOT_USER secret (set in repository secrets)" && exit 1)
+          test -n "${MINIO_ROOT_PASSWORD}" || (echo "::error::Missing CI_MINIO_ROOT_PASSWORD secret (set in repository secrets)" && exit 1)
+
+      - name: Check lake and seed if empty
+        run: bash scripts/pipeline_gate.sh
+        env:
+          MIN_RAW_FILES: "1"
+          SEED_IF_EMPTY: "true"   # bootstrap only on first-ever run
+
       - name: Train model
         id: train
         run: |
