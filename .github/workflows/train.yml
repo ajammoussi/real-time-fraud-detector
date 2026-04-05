@@ -60,7 +60,7 @@ jobs:
       - run: pip install -r requirements/dev.txt
 
       - name: Wait for local S3 and create bucket
-        run: python scripts/wait_for_s3.py --timeout 60 --create-bucket
+        run: PYTHONPATH="$PWD" python scripts/wait_for_s3.py --timeout 60 --create-bucket
 
       - name: "Preflight: required secrets present"
         run: |
