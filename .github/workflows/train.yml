@@ -37,6 +37,9 @@ jobs:
       MINIO_ROOT_USER: "${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}"
       MINIO_ROOT_PASSWORD: "${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}"
       PYTHONPATH: "${{ github.workspace }}"
+      AWS_ACCESS_KEY_ID: "${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}"
+      AWS_SECRET_ACCESS_KEY: "${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}"
+      AWS_DEFAULT_REGION: "us-east-1"
     services:
       minio:
         image: minio/minio:latest

@@ -102,7 +102,8 @@ cfg_ak = os.environ.get('SEAWEED_ACCESS_KEY', 'minioadmin')
 cfg_sk = os.environ.get('SEAWEED_SECRET_KEY', 'minioadmin')
 bucket = os.environ.get('DATALAKE_BUCKET', 'datalake')
 try:
-  print("boto3_version:" + boto3.__version__)
+  import sys as _sys
+  print("boto3_version:" + boto3.__version__, file=_sys.stderr)
   s3 = boto3.client('s3', endpoint_url=cfg_ep,
             aws_access_key_id=cfg_ak, aws_secret_access_key=cfg_sk)
   objs = s3.list_objects_v2(Bucket=bucket, Prefix='raw/')
