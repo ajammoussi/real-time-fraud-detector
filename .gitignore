@@ -13,3 +13,10 @@ mlruns/
 .dvc/tmp/
 *.parquet
 /tmp/
+.venv/
+
+# Coverage outputs
+.coverage
+coverage.xml
+htmlcov/
+tests/coverage/

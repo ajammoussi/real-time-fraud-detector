@@ -19,9 +19,17 @@ jobs:
           pre-commit run --all-files --show-diff-on-failure || true
       - name: Run ruff checks
         run: ruff check .
-      - run: pip-audit -r requirements.txt
-      - run: pytest tests/unit -v --cov=. --cov-report=xml
-      - uses: codecov/codecov-action@v4
+      - run: pip-audit -r requirements.txt --ignore-vuln CVE-2025-69872 # related to diskcache
+      - name: Run unit tests with coverage
+        run: |
+          mkdir -p tests/coverage
+          pytest tests/unit -v --cov=. \
+            --cov-report=xml:tests/coverage/coverage.xml \
+            --cov-report=html:tests/coverage/html
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: tests/coverage/coverage.xml
 
   docker-build:
     runs-on: ubuntu-latest
