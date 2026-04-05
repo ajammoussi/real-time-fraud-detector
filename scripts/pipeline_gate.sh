@@ -18,6 +18,14 @@
 # It exits 0 if training can proceed, non-zero otherwise.
 set -euo pipefail
 
+# Ensure the repository root is on PYTHONPATH so scripts can import top-level
+# project packages (e.g., `config.settings`) when run in CI or via `bash`.
+if [ -z "${PYTHONPATH:-}" ]; then
+  export PYTHONPATH="$PWD"
+else
+  export PYTHONPATH="$PYTHONPATH:$PWD"
+fi
+
 MIN_RAW_FILES="${MIN_RAW_FILES:-1}"   # minimum parquet files before training
 SEED_IF_EMPTY="${SEED_IF_EMPTY:-true}"  # write seed data if lake is empty
 PYTHON_BIN="${PYTHON_BIN:-python}"

@@ -35,6 +35,7 @@ jobs:
       DATALAKE_BUCKET: "${{ secrets.DATALAKE_BUCKET || 'datalake' }}"
       MINIO_ROOT_USER: "${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}"
       MINIO_ROOT_PASSWORD: "${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}"
+      PYTHONPATH: "${{ github.workspace }}"
     services:
       minio:
         image: minio/minio:latest
