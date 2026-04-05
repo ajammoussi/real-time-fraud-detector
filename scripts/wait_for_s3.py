@@ -40,6 +40,18 @@ def main() -> int:
                 s3.create_bucket(Bucket=cfg.datalake_bucket)
                 print(f"Created bucket: {cfg.datalake_bucket}")
 
+            # Initialize Feast registry path (empty object) so Feast can access it
+            if args.create_bucket:
+                try:
+                    s3.put_object(
+                        Bucket=cfg.datalake_bucket, Key="features/registry.db", Body=b""
+                    )
+                    print(
+                        f"Initialized Feast registry: s3://{cfg.datalake_bucket}/features/registry.db"
+                    )
+                except (BotoCoreError, ClientError) as e:
+                    print(f"Note: Could not initialize Feast registry: {e}")
+
             print(f"S3 endpoint ready: {cfg.seaweed_endpoint}")
             return 0
         except (BotoCoreError, ClientError, OSError) as exc:

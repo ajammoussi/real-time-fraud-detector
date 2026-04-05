@@ -136,6 +136,19 @@ else
 fi
 
 echo "=== [3/3] Materialising Feast features ==="
-cd feast && feast materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
+# Feast materialization is optional; if it fails (e.g., registry issues in CI),
+# skip with a warning and allow training to proceed anyway.
+set +e
+(
+  cd feast
+  feast materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
+)
+FEAST_RC=$?
+set -e
+if [ $FEAST_RC -eq 0 ]; then
+  echo "=== Feast features materialized successfully ==="
+else
+  echo "::warning::Feast materialization failed (exit $FEAST_RC) — training will proceed without fresh materialized features."
+fi
 
 echo "=== Ingestion pipeline ready — training can proceed ==="
