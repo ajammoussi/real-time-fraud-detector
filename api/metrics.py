@@ -1,5 +1,6 @@
 """Prometheus metrics definitions."""
-from prometheus_client import Counter, Histogram, Gauge
+
+from prometheus_client import Counter, Gauge, Histogram
 
 predictions_total = Counter(
     "predictions_total",

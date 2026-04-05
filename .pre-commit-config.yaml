@@ -1,24 +1,24 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    rev: v0.15.9
     hooks:
       - id: ruff
         args: [--fix]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
       - id: debug-statements
   - repo: https://github.com/psf/black
-    rev: stable
+    rev: 26.3.1
     hooks:
       - id: black
         language_version: python3
 
   - repo: https://github.com/PyCQA/isort
-    rev: stable
+    rev: 8.0.1
     hooks:
       - id: isort
         name: isort (python)

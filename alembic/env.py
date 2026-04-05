@@ -4,11 +4,14 @@ Reads DB URL from `config.settings.get_settings().postgres_dsn` and sets
 `target_metadata` to `db.models.Base.metadata` so `alembic revision --autogenerate`
 works.
 """
+
 from logging.config import fileConfig
 
-from alembic import context
-
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
+from config.settings import get_settings
+from db.models import Base as ModelsBase
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,10 +21,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import project settings and models
-from config.settings import get_settings
-from db.models import Base as ModelsBase
-
+# Load project settings
 cfg = get_settings()
 
 # Set SQLAlchemy URL from project settings
@@ -45,7 +45,9 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection, target_metadata=target_metadata, compare_type=True
+        )
         with context.begin_transaction():
             context.run_migrations()
 

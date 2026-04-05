@@ -15,25 +15,24 @@ Flush triggers (whichever fires first):
 On validation pass  → write to s3://datalake/raw/realtime_txn_<ISO_TS>.parquet
 On validation fail  → write to s3://datalake/quarantine/<ISO_TS>.parquet + log
 """
+
 from __future__ import annotations
 
 import io
 import json
 import logging
 import signal
-import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 import boto3
 import pandas as pd
 from botocore.exceptions import BotoCoreError, ClientError
-from kafka import KafkaConsumer
 from kafka.errors import KafkaError
 
 from config.settings import get_settings
+from kafka import KafkaConsumer
 
 log = logging.getLogger("lake-consumer")
 logging.basicConfig(
@@ -46,9 +45,21 @@ _PROVENANCE_COLS = {"_source", "_symbol", "_trade_id", "_price", "_quantity"}
 
 # Required schema columns — GX will verify these but we also pre-check here
 _REQUIRED_COLS = {
-    "transaction_id", "timestamp", "user_id", "merchant_id", "merchant_cat",
-    "amount_usd", "currency", "country", "device_type", "ip_hash",
-    "card_last4", "is_international", "hour_of_day", "day_of_week", "label",
+    "transaction_id",
+    "timestamp",
+    "user_id",
+    "merchant_id",
+    "merchant_cat",
+    "amount_usd",
+    "currency",
+    "country",
+    "device_type",
+    "ip_hash",
+    "card_last4",
+    "is_international",
+    "hour_of_day",
+    "day_of_week",
+    "label",
 }
 
 _VALID_DEVICE_TYPES = {
@@ -62,6 +73,7 @@ _VALID_DEVICE_TYPES = {
 
 
 # ─── S3 helpers ────────────────────────────────────────────────────────────
+
 
 def _s3_client():
     cfg = get_settings()
@@ -90,6 +102,7 @@ def _write_parquet_to_s3(df: pd.DataFrame, s3_key: str) -> str:
 
 
 # ─── Great Expectations (lightweight inline) ───────────────────────────────
+
 
 def _validate_batch(df: pd.DataFrame) -> tuple[bool, list[str]]:
     """Run inline validation rules that mirror the GX expectation suite.
@@ -142,6 +155,7 @@ def _validate_batch(df: pd.DataFrame) -> tuple[bool, list[str]]:
 
 # ─── Batch flush ───────────────────────────────────────────────────────────
 
+
 def _flush_batch(records: list[dict]) -> Optional[str]:
     """Validate and persist *records* to the data lake.
 
@@ -150,19 +164,18 @@ def _flush_batch(records: list[dict]) -> Optional[str]:
     if not records:
         return None
 
-    cfg = get_settings()
-    df  = pd.DataFrame(records)
+    df = pd.DataFrame(records)
 
     # Drop provenance-only columns before writing
     drop_cols = [c for c in _PROVENANCE_COLS if c in df.columns]
     df = df.drop(columns=drop_cols)
 
     # Coerce types
-    df["amount_usd"]      = df["amount_usd"].astype(float)
-    df["hour_of_day"]     = df["hour_of_day"].astype(int)
-    df["day_of_week"]     = df["day_of_week"].astype(int)
+    df["amount_usd"] = df["amount_usd"].astype(float)
+    df["hour_of_day"] = df["hour_of_day"].astype(int)
+    df["day_of_week"] = df["day_of_week"].astype(int)
     df["is_international"] = df["is_international"].astype(bool)
-    df["label"]           = df["label"].astype(int)
+    df["label"] = df["label"].astype(int)
 
     passed, failures = _validate_batch(df)
     iso_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -174,7 +187,9 @@ def _flush_batch(records: list[dict]) -> Optional[str]:
         s3_key = f"quarantine/realtime_txn_{iso_ts}.parquet"
         log.warning(
             "✗ Validation FAILED (%d rows) → %s | checks: %s",
-            len(df), s3_key, failures,
+            len(df),
+            s3_key,
+            failures,
         )
 
     try:
@@ -188,6 +203,7 @@ def _flush_batch(records: list[dict]) -> Optional[str]:
 
 # ─── Main consumer loop ────────────────────────────────────────────────────
 
+
 def run() -> None:
     cfg = get_settings()
 
@@ -196,7 +212,7 @@ def run() -> None:
         bootstrap_servers=cfg.kafka_bootstrap_servers,
         group_id=cfg.kafka_consumer_group_lake,
         auto_offset_reset="earliest",
-        enable_auto_commit=False,           # manual commit after flush
+        enable_auto_commit=False,  # manual commit after flush
         value_deserializer=lambda m: json.loads(m.decode("utf-8")),
         fetch_max_wait_ms=500,
         max_poll_records=500,
@@ -209,11 +225,11 @@ def run() -> None:
         cfg.lake_batch_timeout_secs,
     )
 
-    buffer:     list[dict] = []
+    buffer: list[dict] = []
     batch_start = time.monotonic()
-    running     = True
+    running = True
     batches_written = 0
-    total_msgs      = 0
+    total_msgs = 0
 
     def _shutdown(sig, _frame):
         nonlocal running
@@ -221,7 +237,7 @@ def run() -> None:
         running = False
 
     signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT,  _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
 
     try:
         while running:
@@ -243,7 +259,9 @@ def run() -> None:
                 log.info(
                     "Flushing batch (%s trigger) | %d records in buffer | "
                     "elapsed=%.1fs",
-                    trigger, len(buffer), elapsed,
+                    trigger,
+                    len(buffer),
+                    elapsed,
                 )
                 _flush_batch(buffer)
                 consumer.commit()
@@ -262,7 +280,8 @@ def run() -> None:
         consumer.close()
         log.info(
             "Lake consumer stopped | total_msgs=%d | batches_written=%d",
-            total_msgs, batches_written,
+            total_msgs,
+            batches_written,
         )
 
 

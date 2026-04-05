@@ -1,8 +1,11 @@
 """Shadow mode / A/B testing router."""
+
 from __future__ import annotations
+
 import numpy as np
-from config.settings import get_settings
+
 from api.model_loader import load_model
+from config.settings import get_settings
 
 
 class ShadowRouter:
@@ -25,6 +28,6 @@ class ShadowRouter:
 
         return {
             "champion_prob": champion_prob,
-            "shadow_prob":   shadow_prob,
-            "decision":      "REJECT" if champion_prob >= 0.5 else "APPROVE",
+            "shadow_prob": shadow_prob,
+            "decision": "REJECT" if champion_prob >= 0.5 else "APPROVE",
         }

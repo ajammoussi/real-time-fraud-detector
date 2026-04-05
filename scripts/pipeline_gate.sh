@@ -3,8 +3,8 @@
 #
 # ROLE CHANGE
 # -----------
-# This script ensures that the data lake has enough validated Parquet files 
-# before allowing training to proceed, and it can also seed the lake with synthetic data 
+# This script ensures that the data lake has enough validated Parquet files
+# before allowing training to proceed, and it can also seed the lake with synthetic data
 # if it's empty (e.g., on first run).
 #
 #   Binance WebSocket → kafka/producer.py → Kafka (transactions_raw)
@@ -81,28 +81,34 @@ echo "DEBUG: SEAWEED_ENDPOINT=${SEAWEED_ENDPOINT:-unset} DATALAKE_BUCKET=${DATAL
 # Find most recent raw parquet and validate it
 set +e
 LATEST=$($PYTHON_BIN - <<'PY'
-import boto3, os, sys
-cfg_ep  = os.environ.get('SEAWEED_ENDPOINT', 'http://localhost:8333')
-cfg_ak  = os.environ.get('SEAWEED_ACCESS_KEY', 'minioadmin')
-cfg_sk  = os.environ.get('SEAWEED_SECRET_KEY', 'minioadmin')
-bucket  = os.environ.get('DATALAKE_BUCKET', 'datalake')
+import os
+import sys
 try:
-    import boto3
-    print("boto3_version:" + boto3.__version__)
-    s3 = boto3.client('s3', endpoint_url=cfg_ep,
-                      aws_access_key_id=cfg_ak, aws_secret_access_key=cfg_sk)
-    objs = s3.list_objects_v2(Bucket=bucket, Prefix='raw/')
-    files = sorted(
-        [o for o in objs.get('Contents', []) if o['Key'].endswith('.parquet')],
-        key=lambda x: x['LastModified'], reverse=True
-    )
-    if files:
-        print(f"s3://{bucket}/{files[0]['Key']}")
-    else:
-        print("")
+  import boto3
 except Exception as e:
-    print("ERROR:" + str(e))
-    sys.exit(2)
+  print("ERROR: could not import boto3: " + str(e))
+  sys.exit(2)
+
+cfg_ep = os.environ.get('SEAWEED_ENDPOINT', 'http://localhost:8333')
+cfg_ak = os.environ.get('SEAWEED_ACCESS_KEY', 'minioadmin')
+cfg_sk = os.environ.get('SEAWEED_SECRET_KEY', 'minioadmin')
+bucket = os.environ.get('DATALAKE_BUCKET', 'datalake')
+try:
+  print("boto3_version:" + boto3.__version__)
+  s3 = boto3.client('s3', endpoint_url=cfg_ep,
+            aws_access_key_id=cfg_ak, aws_secret_access_key=cfg_sk)
+  objs = s3.list_objects_v2(Bucket=bucket, Prefix='raw/')
+  files = sorted(
+    [o for o in objs.get('Contents', []) if o['Key'].endswith('.parquet')],
+    key=lambda x: x['LastModified'], reverse=True
+  )
+  if files:
+    print(f"s3://{bucket}/{files[0]['Key']}")
+  else:
+    print("")
+except Exception as e:
+  print("ERROR:" + str(e))
+  sys.exit(2)
 PY
 )
 PY_RC=$?

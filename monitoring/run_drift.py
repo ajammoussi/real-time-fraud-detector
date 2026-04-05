@@ -1,13 +1,18 @@
 """Daily drift detection using Evidently AI."""
+
 from __future__ import annotations
-import json, os
+
+import json
+import os
 from datetime import date, timedelta
+
 import boto3
 import pandas as pd
 import psycopg2
 from evidently import ColumnMapping
-from evidently.report import Report
 from evidently.metric_preset import DataDriftPreset
+from evidently.report import Report
+
 from config.settings import get_settings
 
 cfg = get_settings()
@@ -16,6 +21,7 @@ cfg = get_settings()
 def load_reference_data() -> pd.DataFrame:
     """Load training data from SeaweedFS as reference distribution."""
     import s3fs
+
     fs = s3fs.S3FileSystem(
         key=cfg.seaweed_access_key,
         secret=cfg.seaweed_secret_key,
@@ -33,7 +39,7 @@ def load_reference_data() -> pd.DataFrame:
 def load_current_data(days_back: int = 1) -> pd.DataFrame:
     """Pull yesterday's predictions + features from PostgreSQL."""
     since = date.today() - timedelta(days=days_back)
-    conn  = psycopg2.connect(cfg.postgres_dsn)
+    conn = psycopg2.connect(cfg.postgres_dsn)
     df = pd.read_sql_query(
         """
         SELECT features_json, fraud_prob, decision
@@ -66,8 +72,8 @@ def run_drift_report():
     report = Report(metrics=[DataDriftPreset()])
     report.run(reference_data=ref, current_data=cur, column_mapping=col_map)
 
-    today    = date.today().strftime("%Y/%m/%d")
-    out_dir  = f"/tmp/drift_reports/{today}"
+    today = date.today().strftime("%Y/%m/%d")
+    out_dir = f"/tmp/drift_reports/{today}"
     os.makedirs(out_dir, exist_ok=True)
     html_path = f"{out_dir}/report.html"
     json_path = f"{out_dir}/report.json"
@@ -81,8 +87,10 @@ def run_drift_report():
         aws_access_key_id=cfg.seaweed_access_key,
         aws_secret_access_key=cfg.seaweed_secret_key,
     )
-    for local, s3_key in [(html_path, f"drift_reports/{today}/report.html"),
-                           (json_path, f"drift_reports/{today}/report.json")]:
+    for local, s3_key in [
+        (html_path, f"drift_reports/{today}/report.html"),
+        (json_path, f"drift_reports/{today}/report.json"),
+    ]:
         s3.upload_file(local, cfg.datalake_bucket, s3_key)
         print(f"Uploaded → s3://{cfg.datalake_bucket}/{s3_key}")
 

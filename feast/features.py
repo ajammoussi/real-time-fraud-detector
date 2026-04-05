@@ -1,5 +1,7 @@
 """Feast feature definitions for fraud detection."""
+
 from datetime import timedelta
+
 from feast import Entity, Feature, FeatureView, FileSource, ValueType
 
 transactions_source = FileSource(
@@ -8,11 +10,13 @@ transactions_source = FileSource(
     s3_endpoint_override="http://localhost:8333",
 )
 
-user = Entity(name="user_id", value_type=ValueType.STRING,
-              description="E-commerce user")
+user = Entity(
+    name="user_id", value_type=ValueType.STRING, description="E-commerce user"
+)
 
-merchant = Entity(name="merchant_id", value_type=ValueType.STRING,
-                  description="Merchant")
+merchant = Entity(
+    name="merchant_id", value_type=ValueType.STRING, description="Merchant"
+)
 
 user_features = FeatureView(
     name="user_features",

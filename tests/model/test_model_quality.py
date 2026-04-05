@@ -1,15 +1,18 @@
 """Model quality gates — run after training."""
+
 from __future__ import annotations
-import pytest
-import numpy as np
-import mlflow
+
 import time
 from pathlib import Path
+
+import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score, f1_score
-from training.feature_engineering import engineer_features
+import pytest
+from sklearn.metrics import f1_score, roc_auc_score
+
 from api.model_loader import load_model
 from config.settings import get_settings
+from training.feature_engineering import engineer_features
 
 cfg = get_settings()
 
@@ -66,4 +69,4 @@ def test_no_degenerate_predictions(model, val_data):
     X, _ = val_data
     proba = model.predict_proba(X)[:, 1]
     assert proba.mean() > 0.001, "Mean predicted fraud prob is suspiciously low"
-    assert proba.mean() < 0.5,   "Mean predicted fraud prob is suspiciously high"
+    assert proba.mean() < 0.5, "Mean predicted fraud prob is suspiciously high"

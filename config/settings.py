@@ -1,9 +1,10 @@
 """Centralised, validated configuration via Pydantic BaseSettings."""
+
 from functools import lru_cache
 from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 _ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -38,11 +39,13 @@ class Settings(BaseSettings):
 
     # Kafka
     kafka_bootstrap_servers: str = "localhost:9092"
-    kafka_topic_transactions_raw: str = "transactions_raw"   # raw feed from Binance WebSocket
-    kafka_topic_transactions: str = "transactions"           # validated, schema-mapped records
+    kafka_topic_transactions_raw: str = (
+        "transactions_raw"  # raw feed from Binance WebSocket
+    )
+    kafka_topic_transactions: str = "transactions"  # validated, schema-mapped records
     kafka_topic_predictions: str = "predictions"
     kafka_consumer_group: str = "prediction-workers"
-    kafka_consumer_group_lake: str = "lake-writers"          # ingestion consumer group
+    kafka_consumer_group_lake: str = "lake-writers"  # ingestion consumer group
 
     # Binance WebSocket feed (public, no auth required)
     # Docs: https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams
@@ -50,7 +53,7 @@ class Settings(BaseSettings):
     binance_symbols: str = "btcusdt,ethusdt,bnbusdt,solusdt,xrpusdt"  # comma-sep
 
     # Streaming-to-lake ingestion settings
-    lake_batch_size: int = 1_000       # flush after N messages
+    lake_batch_size: int = 1_000  # flush after N messages
     lake_batch_timeout_secs: int = 300  # OR after N seconds, whichever first
 
     # Redis

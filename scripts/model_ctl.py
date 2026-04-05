@@ -1,7 +1,9 @@
 """Promote a model version in MLflow registry."""
+
 import mlflow
 import typer
 from mlflow.exceptions import RestException
+
 from config.settings import get_settings
 
 app = typer.Typer()
@@ -26,10 +28,11 @@ def exists(
     print(f"No {cfg.model_name} in stage {stage}")
     raise typer.Exit(code=1)
 
+
 @app.command()
 def promote(
-    run_id:   str = typer.Argument(..., help="MLflow run ID"),
-    stage:    str = typer.Option("Staging", help="Target stage"),
+    run_id: str = typer.Argument(..., help="MLflow run ID"),
+    stage: str = typer.Option("Staging", help="Target stage"),
 ):
     cfg = get_settings()
     mlflow.set_tracking_uri(cfg.mlflow_tracking_uri)
@@ -38,10 +41,13 @@ def promote(
         name=cfg.model_name, source=f"runs:/{run_id}/model", run_id=run_id
     )
     client.transition_model_version_stage(
-        name=cfg.model_name, version=mv.version, stage=stage,
+        name=cfg.model_name,
+        version=mv.version,
+        stage=stage,
         archive_existing_versions=(stage == "Production"),
     )
     print(f"Promoted {cfg.model_name} v{mv.version} → {stage}")
+
 
 if __name__ == "__main__":
     app()

@@ -1,4 +1,5 @@
 """Validate a Parquet file against gx/expectations/fraud_transactions_suite.json."""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,9 @@ from config.settings import get_settings
 
 
 def _load_suite() -> list[dict]:
-    suite_path = Path(__file__).parent / "expectations" / "fraud_transactions_suite.json"
+    suite_path = (
+        Path(__file__).parent / "expectations" / "fraud_transactions_suite.json"
+    )
     suite = json.loads(suite_path.read_text(encoding="utf-8"))
     return suite.get("expectations", [])
 

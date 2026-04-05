@@ -1,10 +1,14 @@
 """Load the production model from MLflow registry."""
+
 from __future__ import annotations
+
 import mlflow
 from mlflow.tracking import MlflowClient
+
 from config.settings import get_settings
 
 _model_cache: dict = {}
+
 
 def load_model(stage: str | None = None):
     cfg = get_settings()
@@ -26,11 +30,11 @@ def get_model_info(stage: str | None = None) -> dict:
         return {"model_name": cfg.model_name, "stage": target_stage, "version": None}
     v = versions[0]
     return {
-        "model_name":   cfg.model_name,
-        "stage":        target_stage,
-        "version":      v.version,
-        "run_id":       v.run_id,
-        "created_at":   v.creation_timestamp,
+        "model_name": cfg.model_name,
+        "stage": target_stage,
+        "version": v.version,
+        "run_id": v.run_id,
+        "created_at": v.creation_timestamp,
     }
 
 

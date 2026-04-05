@@ -1,16 +1,18 @@
 """Main training entrypoint with MLflow + Optuna."""
+
 from __future__ import annotations
+
 import json
 import os
 import sys
 from pathlib import Path
 
 import mlflow
-from mlflow.tracking import MlflowClient
 import numpy as np
 import optuna
 import pandas as pd
 import s3fs
+from mlflow.tracking import MlflowClient
 from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -52,12 +54,24 @@ def _load_training_params(params_path: str = "params.yaml") -> dict:
     model_cfg = raw.get("model", {}) if isinstance(raw, dict) else {}
 
     params["n_trials"] = int(model_cfg.get("n_trials", params["n_trials"]))
-    params["n_estimators_min"] = int(model_cfg.get("n_estimators_min", params["n_estimators_min"]))
-    params["n_estimators_max"] = int(model_cfg.get("n_estimators_max", params["n_estimators_max"]))
-    params["max_depth_max"] = int(model_cfg.get("max_depth_max", params["max_depth_max"]))
-    params["learning_rate_min"] = float(model_cfg.get("learning_rate_min", params["learning_rate_min"]))
-    params["learning_rate_max"] = float(model_cfg.get("learning_rate_max", params["learning_rate_max"]))
-    params["early_stopping_rounds"] = int(model_cfg.get("early_stopping_rounds", params["early_stopping_rounds"]))
+    params["n_estimators_min"] = int(
+        model_cfg.get("n_estimators_min", params["n_estimators_min"])
+    )
+    params["n_estimators_max"] = int(
+        model_cfg.get("n_estimators_max", params["n_estimators_max"])
+    )
+    params["max_depth_max"] = int(
+        model_cfg.get("max_depth_max", params["max_depth_max"])
+    )
+    params["learning_rate_min"] = float(
+        model_cfg.get("learning_rate_min", params["learning_rate_min"])
+    )
+    params["learning_rate_max"] = float(
+        model_cfg.get("learning_rate_max", params["learning_rate_max"])
+    )
+    params["early_stopping_rounds"] = int(
+        model_cfg.get("early_stopping_rounds", params["early_stopping_rounds"])
+    )
     params["max_files"] = int(model_cfg.get("max_files", params["max_files"]))
     params["max_rows"] = int(model_cfg.get("max_rows", params["max_rows"]))
     return params
@@ -97,34 +111,38 @@ def objective(trial: optuna.Trial, X_tr, y_tr, X_va, y_va) -> float:
     scale_pos_weight = (negative_count / positive_count) if positive_count else 1.0
 
     params = {
-        "n_estimators":       trial.suggest_int(
+        "n_estimators": trial.suggest_int(
             "n_estimators",
             TRAINING_PARAMS["n_estimators_min"],
             TRAINING_PARAMS["n_estimators_max"],
             step=50,
         ),
-        "max_depth":          trial.suggest_int("max_depth", 3, TRAINING_PARAMS["max_depth_max"]),
-        "learning_rate":      trial.suggest_float(
+        "max_depth": trial.suggest_int(
+            "max_depth", 3, TRAINING_PARAMS["max_depth_max"]
+        ),
+        "learning_rate": trial.suggest_float(
             "learning_rate",
             TRAINING_PARAMS["learning_rate_min"],
             TRAINING_PARAMS["learning_rate_max"],
             log=True,
         ),
-        "subsample":          trial.suggest_float("subsample", 0.5, 1.0),
-        "colsample_bytree":   trial.suggest_float("colsample_bytree", 0.5, 1.0),
-        "min_child_weight":   trial.suggest_int("min_child_weight", 1, 10),
-        "reg_alpha":          trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-        "reg_lambda":         trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-        "scale_pos_weight":   scale_pos_weight,
-        "eval_metric":        "auc",
-        "tree_method":        "hist",
-        "random_state":       42,
-        "n_jobs":             -1,
+        "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+        "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+        "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+        "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+        "scale_pos_weight": scale_pos_weight,
+        "eval_metric": "auc",
+        "tree_method": "hist",
+        "random_state": 42,
+        "n_jobs": -1,
     }
-    model = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", XGBClassifier(**params)),
-    ])
+    model = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("clf", XGBClassifier(**params)),
+        ]
+    )
     model.fit(
         X_tr,
         y_tr,
@@ -138,7 +156,7 @@ def objective(trial: optuna.Trial, X_tr, y_tr, X_va, y_va) -> float:
 def train():
     mlflow.set_tracking_uri(cfg.mlflow_tracking_uri)
     mlflow.set_experiment(cfg.mlflow_experiment_name)
-    os.environ["AWS_ACCESS_KEY_ID"]     = cfg.seaweed_access_key
+    os.environ["AWS_ACCESS_KEY_ID"] = cfg.seaweed_access_key
     os.environ["AWS_SECRET_ACCESS_KEY"] = cfg.seaweed_secret_key
     mlflow.set_registry_uri(cfg.mlflow_tracking_uri)
 
@@ -164,8 +182,9 @@ def train():
 
     with mlflow.start_run() as run:
         print("Optimising hyperparameters (Optuna) …")
-        study = optuna.create_study(direction="maximize",
-                                    pruner=optuna.pruners.MedianPruner())
+        study = optuna.create_study(
+            direction="maximize", pruner=optuna.pruners.MedianPruner()
+        )
         study.optimize(
             lambda t: objective(t, X_tr, y_tr, X_va, y_va),
             n_trials=TRAINING_PARAMS["n_trials"],
@@ -179,11 +198,17 @@ def train():
         mlflow.log_params(best_params)
         mlflow.log_param("n_features", int(X.shape[1]))
 
-        final_model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("clf", XGBClassifier(**best_params,
-                                   eval_metric="auc", random_state=42, n_jobs=-1)),
-        ])
+        final_model = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "clf",
+                    XGBClassifier(
+                        **best_params, eval_metric="auc", random_state=42, n_jobs=-1
+                    ),
+                ),
+            ]
+        )
         final_model.fit(
             X_tr,
             y_tr,
@@ -191,12 +216,12 @@ def train():
             clf__verbose=False,
         )
         proba = final_model.predict_proba(X_va)[:, 1]
-        pred  = (proba >= 0.5).astype(int)
+        pred = (proba >= 0.5).astype(int)
 
         metrics = {
-            "auc_roc":    roc_auc_score(y_va, proba),
-            "f1":         f1_score(y_va, pred),
-            "avg_prec":   average_precision_score(y_va, proba),
+            "auc_roc": roc_auc_score(y_va, proba),
+            "f1": f1_score(y_va, pred),
+            "avg_prec": average_precision_score(y_va, proba),
         }
         mlflow.log_metrics(metrics)
         Path("metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
@@ -220,7 +245,8 @@ def train():
                 archive_existing_versions=True,
             )
             print(
-                f"Promoted model '{cfg.model_name}' version {newest.version} to stage '{cfg.model_stage}'"
+                f"Promoted model '{cfg.model_name}' version {newest.version} "
+                f"to stage '{cfg.model_stage}'"
             )
 
         print(f"Run ID: {run.info.run_id}")

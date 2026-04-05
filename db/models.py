@@ -2,18 +2,19 @@
 
 Define the tables used by the application so Alembic can autogenerate migrations.
 """
+
 from sqlalchemy import (
-    Column,
-    BigInteger,
-    Text,
-    Float,
     JSON,
     TIMESTAMP,
-    Date,
-    func,
+    BigInteger,
     CheckConstraint,
-    Index,
+    Column,
+    Date,
+    Float,
     Identity,
+    Index,
+    Text,
+    func,
 )
 from sqlalchemy.orm import declarative_base
 
@@ -23,7 +24,9 @@ Base = declarative_base()
 class Prediction(Base):
     __tablename__ = "predictions"
     __table_args__ = (
-        CheckConstraint("decision IN ('APPROVE','REJECT')", name="ck_predictions_decision"),
+        CheckConstraint(
+            "decision IN ('APPROVE','REJECT')", name="ck_predictions_decision"
+        ),
         Index("idx_predictions_created_at", "created_at"),
         Index("idx_predictions_model_ver", "model_version"),
         Index("idx_predictions_decision", "decision"),
@@ -37,7 +40,9 @@ class Prediction(Base):
     features_json = Column(JSON, nullable=True)
     shadow_prob = Column(Float, nullable=True)
     latency_ms = Column(Float, nullable=True)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class ModelPerformanceLog(Base):
@@ -50,4 +55,6 @@ class ModelPerformanceLog(Base):
     f1 = Column(Float, nullable=True)
     avg_prec = Column(Float, nullable=True)
     drift_score = Column(Float, nullable=True)
-    logged_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    logged_at = Column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )

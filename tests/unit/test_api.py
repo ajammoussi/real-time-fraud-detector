@@ -1,8 +1,8 @@
 """Unit tests for FastAPI endpoints using TestClient."""
-import pytest
+
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
-import numpy as np
 
 from api.main import app
 
@@ -16,8 +16,10 @@ def test_health():
 
 
 @patch("api.routers.predict.get_model_info", return_value={"version": "1"})
-@patch("api.routers.predict.shadow_router.predict",
-       return_value={"champion_prob": 0.03, "shadow_prob": None, "decision": "APPROVE"})
+@patch(
+    "api.routers.predict.shadow_router.predict",
+    return_value={"champion_prob": 0.03, "shadow_prob": None, "decision": "APPROVE"},
+)
 def test_predict_approve(mock_shadow, mock_info):
     payload = {
         "transaction_id": "txn_test001",

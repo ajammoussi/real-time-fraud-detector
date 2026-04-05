@@ -1,11 +1,13 @@
 """Unit tests for feature engineering."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+
 from training.feature_engineering import engineer_features
 
 

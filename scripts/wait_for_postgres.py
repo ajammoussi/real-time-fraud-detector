@@ -2,9 +2,10 @@
 
 Usage: python scripts/wait_for_postgres.py --timeout 60
 """
-import time
+
 import argparse
 import os
+import time
 
 import psycopg2
 
@@ -21,7 +22,12 @@ def wait(timeout: int = 60, interval: float = 1.0) -> bool:
     while time.time() < deadline:
         try:
             conn = psycopg2.connect(
-                host=cfg["host"], port=cfg["port"], dbname=cfg["dbname"], user=cfg["user"], password=cfg["password"], connect_timeout=3
+                host=cfg["host"],
+                port=cfg["port"],
+                dbname=cfg["dbname"],
+                user=cfg["user"],
+                password=cfg["password"],
+                connect_timeout=3,
             )
             conn.close()
             print("postgres available")

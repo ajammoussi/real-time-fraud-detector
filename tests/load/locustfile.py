@@ -1,9 +1,12 @@
 """Locust load test for /predict endpoint."""
-from locust import HttpUser, task, between
-import random, uuid
 
-MERCHANT_CATS = ["electronics","grocery","travel","clothing","restaurants"]
-DEVICE_TYPES  = ["mobile","desktop","tablet","pos_terminal"]
+import random
+import uuid
+
+from locust import HttpUser, between, task
+
+MERCHANT_CATS = ["electronics", "grocery", "travel", "clothing", "restaurants"]
+DEVICE_TYPES = ["mobile", "desktop", "tablet", "pos_terminal"]
 
 
 class PredictUser(HttpUser):

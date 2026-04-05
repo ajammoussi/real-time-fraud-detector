@@ -11,7 +11,9 @@ from config.settings import get_settings
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Wait for S3-compatible endpoint to become ready.")
+    parser = argparse.ArgumentParser(
+        description="Wait for S3-compatible endpoint to become ready."
+    )
     parser.add_argument("--timeout", type=int, default=60, help="Timeout in seconds")
     parser.add_argument(
         "--create-bucket",

@@ -1,10 +1,13 @@
 """Feature retrieval from Feast + manual feature construction."""
-from __future__ import annotations
-import hashlib
-import pandas as pd
-import numpy as np
-from feast import FeatureStore
 
+from __future__ import annotations
+
+import hashlib
+
+import numpy as np
+import pandas as pd
+
+from feast import FeatureStore
 
 _MERCHANT_CAT_MAP = {
     "crypto_exchange": 0,
@@ -42,8 +45,14 @@ _CURRENCY_MAP = {
 }
 
 
-def _encode_with_map(series: pd.Series, mapping: dict[str, int], uppercase: bool = False) -> pd.Series:
-    normalised = series.fillna("").astype(str).str.upper() if uppercase else series.fillna("").astype(str).str.lower()
+def _encode_with_map(
+    series: pd.Series, mapping: dict[str, int], uppercase: bool = False
+) -> pd.Series:
+    if uppercase:
+        normalised = series.fillna("").astype(str).str.upper()
+    else:
+        normalised = series.fillna("").astype(str).str.lower()
+
     return normalised.map(mapping).fillna(len(mapping)).astype(int)
 
 
@@ -69,11 +78,11 @@ def get_feast_features(df: pd.DataFrame, repo_path: str = "./feast") -> pd.DataF
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Stateless, row-level feature engineering."""
     out = df.copy()
-    out["amount_log"]         = np.log1p(out["amount_usd"])
-    out["is_high_amount"]     = (out["amount_usd"] > 1000).astype(int)
-    out["is_odd_hour"]        = (out["hour_of_day"].between(0, 5)).astype(int)
-    out["is_weekend"]         = (out["day_of_week"] >= 5).astype(int)
-    out["is_international"]   = out["is_international"].astype(int)
+    out["amount_log"] = np.log1p(out["amount_usd"])
+    out["is_high_amount"] = (out["amount_usd"] > 1000).astype(int)
+    out["is_odd_hour"] = (out["hour_of_day"].between(0, 5)).astype(int)
+    out["is_weekend"] = (out["day_of_week"] >= 5).astype(int)
+    out["is_international"] = out["is_international"].astype(int)
 
     out["merchant_cat"] = _encode_with_map(out["merchant_cat"], _MERCHANT_CAT_MAP)
     out["device_type"] = _encode_with_map(out["device_type"], _DEVICE_TYPE_MAP)
@@ -87,16 +96,31 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         .map(lambda c: int(hashlib.md5(c.encode("utf-8")).hexdigest()[:8], 16) % 997)
     ).astype(int)
 
-    drop_cols = ["transaction_id", "timestamp", "user_id", "merchant_id",
-                 "ip_hash", "card_last4"]
+    drop_cols = [
+        "transaction_id",
+        "timestamp",
+        "user_id",
+        "merchant_id",
+        "ip_hash",
+        "card_last4",
+    ]
     out = out.drop(columns=[c for c in drop_cols if c in out.columns])
     return out
 
 
 FEATURE_COLS = [
-    "amount_usd", "amount_log", "is_high_amount", "is_odd_hour", "is_weekend",
-    "is_international", "hour_of_day", "day_of_week",
-    "merchant_cat", "device_type", "currency", "country",
+    "amount_usd",
+    "amount_log",
+    "is_high_amount",
+    "is_odd_hour",
+    "is_weekend",
+    "is_international",
+    "hour_of_day",
+    "day_of_week",
+    "merchant_cat",
+    "device_type",
+    "currency",
+    "country",
 ]
 
 
@@ -108,5 +132,7 @@ def get_model_input_frame(df: pd.DataFrame) -> pd.DataFrame:
     """
     ordered_cols = [c for c in FEATURE_COLS if c in df.columns]
     if not ordered_cols:
-        raise ValueError("No model feature columns were found after feature engineering")
+        raise ValueError(
+            "No model feature columns were found after feature engineering"
+        )
     return df[ordered_cols].fillna(0)

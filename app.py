@@ -1,12 +1,16 @@
 """Gradio demo UI for HuggingFace Spaces."""
+
+import os
+
 import gradio as gr
-import httpx, os
+import httpx
 
 API_URL = os.getenv("FRAUD_API_URL", "http://localhost:8000")
 
 
-def predict(transaction_id, amount_usd, merchant_cat, device_type,
-            hour_of_day, is_international):
+def predict(
+    transaction_id, amount_usd, merchant_cat, device_type, hour_of_day, is_international
+):
     payload = {
         "transaction_id": transaction_id or "txn_demo",
         "timestamp": "2024-06-15T14:32:07Z",
@@ -27,10 +31,10 @@ def predict(transaction_id, amount_usd, merchant_cat, device_type,
         r = httpx.post(f"{API_URL}/predict/", json=payload, timeout=10)
         r.raise_for_status()  # raise on 4xx/5xx status codes
         data = r.json()
-        prob   = data.get("fraud_probability")
+        prob = data.get("fraud_probability")
         if prob is None:
-            return f"API error: missing fraud_probability in response", "—", "—"
-        label  = f"{'🚨 FRAUD' if prob > 0.5 else '✅ LEGIT'} ({prob:.1%})"
+            return "API error: missing fraud_probability in response", "—", "—"
+        label = f"{'🚨 FRAUD' if prob > 0.5 else '✅ LEGIT'} ({prob:.1%})"
         model_ver = data.get("model_version", "unknown")
         latency = data.get("latency_ms", 0)
         return label, model_ver, f"{latency:.1f} ms"
@@ -45,8 +49,8 @@ demo = gr.Interface(
     inputs=[
         gr.Textbox(label="Transaction ID", value="txn_abc123"),
         gr.Number(label="Amount (USD)", value=49.99),
-        gr.Dropdown(["electronics","grocery","travel","clothing"], label="Category"),
-        gr.Dropdown(["mobile","desktop","tablet"], label="Device"),
+        gr.Dropdown(["electronics", "grocery", "travel", "clothing"], label="Category"),
+        gr.Dropdown(["mobile", "desktop", "tablet"], label="Device"),
         gr.Slider(0, 23, value=14, label="Hour of Day"),
         gr.Checkbox(label="International?"),
     ],

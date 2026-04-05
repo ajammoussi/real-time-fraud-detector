@@ -30,18 +30,18 @@ jobs:
   train:
     runs-on: ubuntu-latest
     env:
-      SEAWEED_ENDPOINT: ${{ secrets.SEAWEED_ENDPOINT || 'http://localhost:9000' }}
-      SEAWEED_ACCESS_KEY: ${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}
-      SEAWEED_SECRET_KEY: ${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}
-      DATALAKE_BUCKET: ${{ secrets.DATALAKE_BUCKET || 'datalake' }}
-      MINIO_ROOT_USER: ${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}
-      MINIO_ROOT_PASSWORD: ${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}
+      SEAWEED_ENDPOINT: "${{ secrets.SEAWEED_ENDPOINT || 'http://localhost:9000' }}"
+      SEAWEED_ACCESS_KEY: "${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}"
+      SEAWEED_SECRET_KEY: "${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}"
+      DATALAKE_BUCKET: "${{ secrets.DATALAKE_BUCKET || 'datalake' }}"
+      MINIO_ROOT_USER: "${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}"
+      MINIO_ROOT_PASSWORD: "${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}"
     services:
       minio:
         image: minio/minio:latest
         env:
-          MINIO_ROOT_USER: ${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}
-          MINIO_ROOT_PASSWORD: ${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}
+          MINIO_ROOT_USER: "${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}"
+          MINIO_ROOT_PASSWORD: "${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}"
         ports:
           - 9000:9000
           - 9001:9001
@@ -62,7 +62,7 @@ jobs:
       - name: Wait for local S3 and create bucket
         run: python scripts/wait_for_s3.py --timeout 60 --create-bucket
 
-      - name: Preflight: required secrets present
+      - name: "Preflight: required secrets present"
         run: |
           test -n "${DATALAKE_BUCKET}" || (echo "::error::Missing DATALAKE_BUCKET" && exit 1)
           test -n "${SEAWEED_ENDPOINT}" || (echo "::error::Missing SEAWEED_ENDPOINT" && exit 1)

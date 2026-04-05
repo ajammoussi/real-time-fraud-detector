@@ -27,6 +27,7 @@ Usage:
     python kafka/producer.py --symbols btcusdt,ethusdt
     python kafka/producer.py --dry-run              # print without publishing
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -39,10 +40,10 @@ from datetime import datetime, timezone
 
 import typer
 import websockets
-from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
 from config.settings import get_settings
+from kafka import KafkaProducer
 
 log = logging.getLogger("binance-producer")
 logging.basicConfig(
@@ -51,38 +52,86 @@ logging.basicConfig(
 )
 
 _MERCHANT_CATS = [
-    "crypto_exchange", "crypto_exchange", "crypto_exchange",  # weighted
-    "gaming", "electronics", "travel", "finance",
+    "crypto_exchange",
+    "crypto_exchange",
+    "crypto_exchange",  # weighted
+    "gaming",
+    "electronics",
+    "travel",
+    "finance",
 ]
 
 
 def _extract_currencies_from_symbol(symbol: str) -> tuple[str, str]:
     """Extract base and quote currencies from Binance symbol.
-    
+
     Binance symbols are typically formatted as BASEQUOTE (e.g., BTCUSDT, ETHBUSD).
     This function splits the symbol into base and quote currencies by recognizing
     common quote currencies.
-    
+
     Args:
         symbol: Binance symbol (e.g., "BTCUSDT", "ETHBUSD", "XRPUSDC")
-    
+
     Returns:
         Tuple of (base_currency, quote_currency)
     """
     # Common quote currencies in Binance
-    quote_currencies = ["BUSD", "USDC", "USDT", "EUR", "GBP", "TRY", "RUB", "UAH", 
-                        "BRL", "AUD", "CAD", "CHF", "CNY", "CZK", "DKK", "HKD", 
-                        "HUF", "IDR", "ILS", "INR", "JPY", "KRW", "MXN", "MYR", 
-                        "NOK", "NZD", "PHP", "PKR", "PLN", "SAR", "SEK", "SGD", 
-                        "THB", "TWD", "ZAR", "BNB", "BTC", "ETH", "XRP", "ADA", 
-                        "DOGE", "DOT", "UNI", "LINK", "LTC", "BCH", "XLM"]
-    
+    quote_currencies = [
+        "BUSD",
+        "USDC",
+        "USDT",
+        "EUR",
+        "GBP",
+        "TRY",
+        "RUB",
+        "UAH",
+        "BRL",
+        "AUD",
+        "CAD",
+        "CHF",
+        "CNY",
+        "CZK",
+        "DKK",
+        "HKD",
+        "HUF",
+        "IDR",
+        "ILS",
+        "INR",
+        "JPY",
+        "KRW",
+        "MXN",
+        "MYR",
+        "NOK",
+        "NZD",
+        "PHP",
+        "PKR",
+        "PLN",
+        "SAR",
+        "SEK",
+        "SGD",
+        "THB",
+        "TWD",
+        "ZAR",
+        "BNB",
+        "BTC",
+        "ETH",
+        "XRP",
+        "ADA",
+        "DOGE",
+        "DOT",
+        "UNI",
+        "LINK",
+        "LTC",
+        "BCH",
+        "XLM",
+    ]
+
     for quote in quote_currencies:
         if symbol.endswith(quote):
-            base = symbol[:-len(quote)]
+            base = symbol[: -len(quote)]
             if base:  # Ensure base is not empty
                 return base, quote
-    
+
     # Fallback: If no known quote found, assume last 3-4 chars are the quote
     if len(symbol) > 4:
         # assume quote is 3-4 characters
@@ -92,7 +141,7 @@ def _extract_currencies_from_symbol(symbol: str) -> tuple[str, str]:
                 base = symbol[:-quote_len]
                 if base and potential_quote.isalpha():
                     return base, potential_quote
-    
+
     # Last resort: return the whole symbol as base and unknown as quote
     log.warning(f"Could not parse symbol '{symbol}', using default mapping")
     return symbol, "USD"
@@ -106,23 +155,50 @@ def _symbol_to_currency(symbol: str) -> str:
 
 def _symbol_to_country(symbol: str) -> str:
     """Map a currency to a likely country based on the quote currency.
-    
+
     Uses the quote currency to determine the most likely country.
     Returns 'US' as default for USD-based pairs or unknown currencies.
     """
     _, quote = _extract_currencies_from_symbol(symbol)
-    
+
     # Map common fiat currencies to their primary countries
     currency_country_map = {
-        "USD": "US", "EUR": "DE", "GBP": "GB", "JPY": "JP", "CNY": "CN",
-        "KRW": "KR", "BRL": "BR", "CAD": "CA", "AUD": "AU", "CHF": "CH",
-        "TRY": "TR", "RUB": "RU", "INR": "IN", "MXN": "MX", "ZAR": "ZA",
-        "SGD": "SG", "HKD": "HK", "NZD": "NZ", "SEK": "SE", "NOK": "NO",
-        "DKK": "DK", "PLN": "PL", "CZK": "CZ", "HUF": "HU", "ILS": "IL",
-        "AED": "AE", "SAR": "SA", "THB": "TH", "VND": "VN", "IDR": "ID",
-        "PHP": "PH", "PKR": "PK", "EGP": "EG", "NGN": "NG"
+        "USD": "US",
+        "EUR": "DE",
+        "GBP": "GB",
+        "JPY": "JP",
+        "CNY": "CN",
+        "KRW": "KR",
+        "BRL": "BR",
+        "CAD": "CA",
+        "AUD": "AU",
+        "CHF": "CH",
+        "TRY": "TR",
+        "RUB": "RU",
+        "INR": "IN",
+        "MXN": "MX",
+        "ZAR": "ZA",
+        "SGD": "SG",
+        "HKD": "HK",
+        "NZD": "NZ",
+        "SEK": "SE",
+        "NOK": "NO",
+        "DKK": "DK",
+        "PLN": "PL",
+        "CZK": "CZ",
+        "HUF": "HU",
+        "ILS": "IL",
+        "AED": "AE",
+        "SAR": "SA",
+        "THB": "TH",
+        "VND": "VN",
+        "IDR": "ID",
+        "PHP": "PH",
+        "PKR": "PK",
+        "EGP": "EG",
+        "NGN": "NG",
     }
-    
+
     # For crypto quote currencies, use a deterministic mapping based on the currency hash
     if quote not in currency_country_map:
         # Crypto quotes: assign country based on deterministic hash
@@ -131,7 +207,7 @@ def _symbol_to_country(symbol: str) -> str:
         crypto_countries = ["US", "SG", "JP", "KR", "AE", "CH", "DE", "GB"]
         index = int(hash_val[:8], 16) % len(crypto_countries)
         return crypto_countries[index]
-    
+
     return currency_country_map.get(quote, "US")
 
 
@@ -145,49 +221,49 @@ def _map_binance_trade(data: dict) -> dict:
     Returns:
         A dict matching the fraud-detection transaction schema exactly.
     """
-    symbol   = data["s"]                             # e.g. "BTCUSDT"
-    trade_id = data["a"]                             # integer aggregate trade id
-    price    = float(data["p"])
-    qty      = float(data["q"])
+    symbol = data["s"]  # e.g. "BTCUSDT"
+    trade_id = data["a"]  # integer aggregate trade id
+    price = float(data["p"])
+    qty = float(data["q"])
     trade_ts = datetime.fromtimestamp(data["T"] / 1000, tz=timezone.utc)
     is_maker = bool(data["m"])
 
     # Derive pseudo-user/merchant from trade_id and symbol deterministically
-    user_bucket     = (trade_id // 100) % 50_000
-    merchant_bucket = (trade_id // 10)  % 5_000
-    cat_index       = (trade_id % len(_MERCHANT_CATS))
-    ip_seed         = f"{symbol}:{trade_id}".encode()
+    user_bucket = (trade_id // 100) % 50_000
+    merchant_bucket = (trade_id // 10) % 5_000
+    cat_index = trade_id % len(_MERCHANT_CATS)
+    ip_seed = f"{symbol}:{trade_id}".encode()
 
     # amount_usd = price × quantity, capped at 50 000 to stay inside GX bounds
     amount_usd = round(min(price * qty, 49_999.99), 2)
-    currency   = _symbol_to_currency(symbol)
-    country    = _symbol_to_country(symbol)
-    is_intl    = country != "US"
+    currency = _symbol_to_currency(symbol)
+    country = _symbol_to_country(symbol)
+    is_intl = country != "US"
 
     return {
-        "transaction_id":  f"txn_{symbol.lower()}_{trade_id}",
-        "timestamp":       trade_ts.isoformat(),
-        "user_id":         f"usr_{user_bucket:05d}",
-        "merchant_id":     f"mrch_{merchant_bucket:04d}",
-        "merchant_cat":    _MERCHANT_CATS[cat_index],
-        "amount_usd":      amount_usd,
-        "currency":        currency,
-        "country":         country,
-        "device_type":     "exchange_maker" if is_maker else "exchange_taker",
-        "ip_hash":         hashlib.md5(ip_seed).hexdigest()[:8],
-        "card_last4":      f"{(trade_id % 9000) + 1000}",
+        "transaction_id": f"txn_{symbol.lower()}_{trade_id}",
+        "timestamp": trade_ts.isoformat(),
+        "user_id": f"usr_{user_bucket:05d}",
+        "merchant_id": f"mrch_{merchant_bucket:04d}",
+        "merchant_cat": _MERCHANT_CATS[cat_index],
+        "amount_usd": amount_usd,
+        "currency": currency,
+        "country": country,
+        "device_type": "exchange_maker" if is_maker else "exchange_taker",
+        "ip_hash": hashlib.md5(ip_seed).hexdigest()[:8],
+        "card_last4": f"{(trade_id % 9000) + 1000}",
         "is_international": is_intl,
-        "hour_of_day":     trade_ts.hour,
-        "day_of_week":     trade_ts.weekday(),
+        "hour_of_day": trade_ts.hour,
+        "day_of_week": trade_ts.weekday(),
         # label is always 0 here — real fraud labels come from downstream
         # labelling jobs or human review; we leave the field for schema compat
-        "label":           0,
+        "label": 0,
         # extra provenance fields (stripped before model inference)
-        "_source":         "binance_ws",
-        "_symbol":         symbol,
-        "_trade_id":       trade_id,
-        "_price":          price,
-        "_quantity":       qty,
+        "_source": "binance_ws",
+        "_symbol": symbol,
+        "_trade_id": trade_id,
+        "_price": price,
+        "_quantity": qty,
     }
 
 
@@ -218,12 +294,13 @@ def _make_kafka_producer() -> KafkaProducer:
     )
 
 
-async def _stream(symbols: list[str], producer: KafkaProducer | None,
-                  dry_run: bool, max_messages: int) -> None:
-    cfg     = get_settings()
-    topic   = cfg.kafka_topic_transactions_raw
-    ws_url  = _build_ws_url(symbols)
-    count   = 0
+async def _stream(
+    symbols: list[str], producer: KafkaProducer | None, dry_run: bool, max_messages: int
+) -> None:
+    cfg = get_settings()
+    topic = cfg.kafka_topic_transactions_raw
+    ws_url = _build_ws_url(symbols)
+    count = 0
 
     log.info("Connecting to Binance WebSocket: %s", ws_url)
     log.info("Publishing to Kafka topic       : %s", topic)
@@ -244,7 +321,7 @@ async def _stream(symbols: list[str], producer: KafkaProducer | None,
                     continue  # skip non-trade messages (pings, errors)
 
                 record = _map_binance_trade(data)
-                key    = record["transaction_id"]
+                key = record["transaction_id"]
 
                 if dry_run:
                     print(json.dumps(record, indent=2))
@@ -274,13 +351,17 @@ app = typer.Typer(add_completion=False)
 
 @app.command()
 def main(
-    symbols:      str  = typer.Option("", help="Comma-sep symbols, overrides env var"),
-    dry_run:      bool = typer.Option(False, help="Print records, do not publish to Kafka"),
-    max_messages: int  = typer.Option(0,  help="Stop after N messages (0 = infinite)"),
+    symbols: str = typer.Option("", help="Comma-sep symbols, overrides env var"),
+    dry_run: bool = typer.Option(False, help="Print records, do not publish to Kafka"),
+    max_messages: int = typer.Option(0, help="Stop after N messages (0 = infinite)"),
 ):
     """Stream Binance trades → Kafka topic `transactions_raw`."""
     cfg = get_settings()
-    sym_list = [s.strip().upper() for s in (symbols or cfg.binance_symbols).split(",") if s.strip()]
+    sym_list = [
+        s.strip().upper()
+        for s in (symbols or cfg.binance_symbols).split(",")
+        if s.strip()
+    ]
 
     producer = None if dry_run else _make_kafka_producer()
 

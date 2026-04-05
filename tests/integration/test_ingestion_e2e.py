@@ -1,4 +1,5 @@
 """Integration test for ingestion control status output."""
+
 from __future__ import annotations
 
 import json
