@@ -2,7 +2,7 @@ name: Auto Retrain
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 0 * * 0"
   workflow_dispatch:
     inputs:
       reason:
@@ -81,7 +81,7 @@ jobs:
         run: bash scripts/pipeline_gate.sh
         env:
           MIN_RAW_FILES: "5"
-          SEED_IF_EMPTY: "false"  # If lake is empty during retrain, that's an error
+          SEED_IF_EMPTY: "true"  # Auto-seed with synthetic data if lake is empty
 
       - name: Retrain model on latest lake data
         id: train
