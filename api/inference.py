@@ -12,7 +12,7 @@ import logging
 import pandas as pd
 
 from api.metrics import feature_store_errors_total
-from api.model_loader import get_model_info, load_model
+from api.model_loader import load_model_and_info
 from config.settings import get_settings
 from features import store as feature_store
 from features.schema import VELOCITY_FEATURES
@@ -42,10 +42,14 @@ def _velocity_features(user_id: str, merchant_id: str) -> pd.DataFrame:
 def score(transaction: dict, *, model=None, info: dict | None = None) -> dict:
     """Score one transaction and return the probability, decision and inputs."""
     cfg = get_settings()
-    if info is None:
-        info = get_model_info()
-    if model is None:
-        model = load_model()
+    if model is None or info is None:
+        # One lookup so the version and threshold always describe the artifact
+        # in memory, never a version that has just been promoted ahead of it.
+        loaded_model, loaded_info = load_model_and_info()
+        if model is None:
+            model = loaded_model
+        if info is None:
+            info = loaded_info
 
     # user/merchant ids are needed for the feature lookup and then dropped by
     # engineer_features, so read them from the raw transaction first.

@@ -21,8 +21,8 @@ class ModelUnavailable(RuntimeError):
     """No model version is servable for the requested stage."""
 
 
-# stage → (monotonic cached_at, model)
-_cache: dict[str, tuple[float, Any]] = {}
+# stage → (monotonic cached_at, model, registry info for that exact version)
+_cache: dict[str, tuple[float, Any, dict]] = {}
 # stage → (version, run_id) currently held in _cache
 _identity: dict[str, tuple[str, str]] = {}
 
@@ -61,8 +61,14 @@ def get_model_info(stage: str | None = None) -> dict:
     }
 
 
-def load_model(stage: str | None = None):
-    """Return the model for *stage*, refreshing it once the cache TTL lapses."""
+def load_model_and_info(stage: str | None = None) -> tuple[Any, dict]:
+    """Return (model, info) for *stage*, refreshing both when the cache TTL lapses.
+
+    The metadata is cached alongside the artifact on purpose: version and
+    decision_threshold must describe the model that actually produces the score.
+    Reading the registry separately would let a freshly promoted version be
+    stamped on predictions the previous artifact scored, for up to one TTL.
+    """
     cfg = get_settings()
     mlflow.set_tracking_uri(cfg.mlflow_tracking_uri)
 
@@ -71,7 +77,7 @@ def load_model(stage: str | None = None):
     now = time.monotonic()
 
     if cached and now - cached[0] <= cfg.model_cache_ttl_secs:
-        return cached[1]
+        return cached[1], cached[2]
 
     try:
         info = get_model_info(target_stage)
@@ -85,9 +91,9 @@ def load_model(stage: str | None = None):
 
     identity = (str(info["version"]), str(info["run_id"]))
     if cached and _identity.get(target_stage) == identity:
-        # Same artifact as before — just renew the timestamp.
-        _cache[target_stage] = (now, cached[1])
-        return cached[1]
+        # Same artifact as before — renew the timestamp and pick up tag changes.
+        _cache[target_stage] = (now, cached[1], info)
+        return cached[1], info
 
     invalidate_cache()
     try:
@@ -96,6 +102,11 @@ def load_model(stage: str | None = None):
         raise ModelUnavailable(
             f"could not load {cfg.model_name}/{target_stage} v{info['version']}: {exc}"
         ) from exc
-    _cache[target_stage] = (now, model)
+    _cache[target_stage] = (now, model, info)
     _identity[target_stage] = identity
-    return model
+    return model, info
+
+
+def load_model(stage: str | None = None):
+    """Return the model for *stage*, refreshing it once the cache TTL lapses."""
+    return load_model_and_info(stage)[0]

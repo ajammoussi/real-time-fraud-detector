@@ -12,7 +12,7 @@ import random
 import time
 
 from api.inference import score
-from api.model_loader import ModelUnavailable, get_model_info, load_model
+from api.model_loader import ModelUnavailable, load_model_and_info
 from config.settings import get_settings
 
 log = logging.getLogger("api.shadow")
@@ -35,11 +35,8 @@ class ShadowRouter:
             and random.random() < self.cfg.shadow_traffic_fraction
         ):
             try:
-                challenger_result = score(
-                    transaction,
-                    model=load_model(self.cfg.challenger_stage),
-                    info=get_model_info(self.cfg.challenger_stage),
-                )
+                challenger_model, challenger_info = load_model_and_info(self.cfg.challenger_stage)
+                challenger_result = score(transaction, model=challenger_model, info=challenger_info)
                 challenger = {
                     "prob": challenger_result["fraud_probability"],
                     "decision": challenger_result["decision"],
