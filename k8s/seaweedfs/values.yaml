@@ -1,0 +1,23 @@
+# Helm values for seaweedfs/seaweedfs chart
+master:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+
+volume:
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 50Gi
+
+filer:
+  enabled: true
+  replicaCount: 1
+
+s3:
+  enabled: true
+  port: 8333
+  domainName: ""
+  enableAuth: true
+  existingConfigSecret: seaweedfs-s3-secret

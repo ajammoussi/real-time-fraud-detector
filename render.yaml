@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: fraud-detection-api
+    env: docker
+    dockerfilePath: ./docker/Dockerfile.api
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MLFLOW_TRACKING_URI
+        sync: false
+      - key: SEAWEED_ENDPOINT
+        sync: false
+      - key: SEAWEED_ACCESS_KEY
+        sync: false
+      - key: SEAWEED_SECRET_KEY
+        sync: false
+      - key: POSTGRES_HOST
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        sync: false
+      - key: MODEL_STAGE
+        value: Production

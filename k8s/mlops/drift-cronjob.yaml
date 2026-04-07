@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-drift
+  namespace: mlops
+spec:
+  schedule: "0 2 * * *"    # 02:00 UTC daily
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: drift
+              image: your-registry/fraud-monitoring:latest
+              command: ["python", "monitoring/run_drift.py"]
+              envFrom:
+                - secretRef: {name: mlops-secrets}
