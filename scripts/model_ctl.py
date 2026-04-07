@@ -49,6 +49,8 @@ def promote(
     """Move the version registered by *run_id* into *stage*."""
     cfg = get_settings()
     client = _client()
+    # Windows command substitution leaves a trailing CR (`make bootstrap-model`).
+    run_id = run_id.strip()
 
     try:
         versions = client.search_model_versions(f"run_id='{run_id}'")

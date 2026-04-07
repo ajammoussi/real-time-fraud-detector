@@ -44,7 +44,7 @@ def _isolate(monkeypatch):
         "mlflow",
         types.SimpleNamespace(
             set_tracking_uri=lambda uri: None,
-            sklearn=types.SimpleNamespace(load_model=fake_load),
+            xgboost=types.SimpleNamespace(load_model=fake_load),
         ),
     )
     yield types.SimpleNamespace(clock=clock, registry=registry, artifacts=artifacts)

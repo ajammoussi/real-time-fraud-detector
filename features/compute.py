@@ -1,7 +1,7 @@
 """Batch computation of user and merchant velocity features.
 
 Reads the raw lake, aggregates amount activity per entity per hour, and writes
-two fixed parquet keys that Feast serves (feature_repo/features.py):
+two fixed parquet keys that Feast serves (feature_repo/definitions.py):
 
     s3://<bucket>/features/user_stats.parquet
     s3://<bucket>/features/merchant_stats.parquet

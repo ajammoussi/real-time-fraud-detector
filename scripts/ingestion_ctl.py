@@ -2,7 +2,8 @@
 
 Commands:
   1. `status` — report what the data lake currently holds (JSON)
-  2. `latest` — print the s3:// URI of the newest raw parquet (empty if none)
+  2. `latest` — print the s3:// URI of the newest raw parquet (empty if none);
+     `--requires label` skips the unlabelled live batches
   3. `start`  — launch the Binance WebSocket producer as a background process
      (local dev helper; in Docker it runs as the `binance-producer` service)
   4. `seed`   — one-time synthetic bootstrap for an empty lake. This is the
@@ -29,7 +30,7 @@ import pandas as pd
 import typer
 
 from config.settings import get_settings
-from datalake.storage import lake_status, list_parquet, write_parquet
+from datalake.storage import lake_status, list_parquet, parquet_columns, write_parquet
 
 app = typer.Typer(add_completion=False, help=__doc__)
 
@@ -92,8 +93,18 @@ def status():
 
 
 @app.command()
-def latest():
-    """Print the s3:// URI of the newest raw parquet, or nothing if the lake is empty."""
+def latest(
+    requires: str = typer.Option(
+        "",
+        "--requires",
+        help="Comma-separated columns the batch must contain — e.g. `label`",
+    ),
+):
+    """Print the s3:// URI of the newest raw parquet, or nothing if the lake is empty.
+
+    With `--requires label`, live (unlabelled) batches written by the lake
+    consumer are skipped, so the training gate validates a batch it can train on.
+    """
     cfg = get_settings()
     try:
         keys = list_parquet("raw/")
@@ -101,7 +112,18 @@ def latest():
         print(f"Error reaching the data lake: {exc}", file=sys.stderr)
         raise typer.Exit(code=1) from exc
 
-    print(f"s3://{cfg.datalake_bucket}/{keys[-1]}" if keys else "")
+    needed = {column.strip() for column in requires.split(",") if column.strip()}
+    for key in reversed(keys):
+        if needed:
+            try:
+                if not needed <= set(parquet_columns(key)):
+                    continue
+            except Exception as exc:  # unreadable object: try the next one
+                print(f"Skipping {key}: {exc}", file=sys.stderr)
+                continue
+        print(f"s3://{cfg.datalake_bucket}/{key}")
+        return
+    print("")
 
 
 @app.command()

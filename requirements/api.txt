@@ -18,9 +18,9 @@ scikit-learn>=1.4
 xgboost>=2.0,<4
 boto3>=1.34
 pyarrow>=21
-pandas>=2.2
+pandas>=2.2,<3
 numpy>=1.26
-feast[redis]>=0.61,<0.70
+feast[redis]>=0.68,<0.70
 
 # Monitoring & Metrics
 prometheus-client>=0.20

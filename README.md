@@ -91,7 +91,7 @@ The platform implements a **5-lane streaming architecture** with SeaweedFS as th
 - **Binance WebSocket Producer** (`ingestion/producer.py`): real-time trade feed to Kafka. The record is deliberately unlabelled; `country`/`is_international` are derived from the quote asset (a crypto feed has no geography) and `country` is never a model feature
 - **Lake Consumer** (`ingestion/lake_consumer.py`): Kafka → SeaweedFS batch writer with configurable flush windows, cheap pre-checks that divert bad batches to `quarantine/`, and offsets committed only after a durable write
 - **Great Expectations** (`gx/validate.py`, `gx/expectations/`): the training dataset contract, enforced as a hard gate inside `training/build_dataset.py`
-- **Feast Feature Store** (`feature_repo/features.py`, `features/compute.py`, `features/store.py`): hourly user/merchant velocity aggregates in the offline store, served online from Redis
+- **Feast Feature Store** (`feature_repo/definitions.py`, `features/compute.py`, `features/store.py`): hourly user/merchant velocity aggregates in the offline store, served online from Redis
 
 ### Model Training Pipeline
 - **Feature Engineering** (`training/feature_engineering.py`): deterministic row-level features plus the ordered `FEATURE_COLS` contract shared with serving
@@ -671,6 +671,10 @@ real-time-fraud-detector/
 # Unit + integration tests (no services required)
 make test
 
+# Outside an activated virtualenv, point make at the project interpreter:
+make test PYTHON=.venv/Scripts/python.exe    # Windows
+make test PYTHON=.venv/bin/python            # macOS / Linux
+
 # Individual suites
 pytest tests/unit -v
 pytest tests/integration -v
@@ -749,9 +753,10 @@ one.
 
 Labels enter the pipeline through exactly one path — the synthetic seed
 (`make seed` → `scripts/ingestion_ctl.py seed`), which writes labelled rows to
-`s3://datalake/raw/seed_*.parquet`. Training joins those labelled rows with the
-engineered features; live traffic is used for features and drift detection, not
-for fitting.
+`s3://datalake/raw/seed_*.parquet`. Training reads those labelled batches
+explicitly (`dataset.max_files` newest of them), so the unlabelled live batches
+the producer keeps appending never push the labelled data out of the window.
+Live traffic is used for features and drift detection, not for fitting.
 
 Consequently the classifier is a **demonstration trained on synthetic labels**,
 not a production fraud model. `training/build_dataset.py` refuses to train when

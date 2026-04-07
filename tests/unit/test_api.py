@@ -103,3 +103,16 @@ def test_predict_survives_database_failure(mock_shadow, mock_record):
 
     assert r.status_code == 200
     assert r.json()["decision"] == "APPROVE"
+
+
+@patch("api.routers.predict.record_prediction", return_value=True)
+@patch("api.routers.predict.shadow_router.predict")
+def test_metrics_is_served_without_a_redirect(mock_shadow, mock_record):
+    mock_shadow.return_value = {"champion": CHAMPION, "challenger": None}
+    client.post("/predict/", json=PAYLOAD)
+
+    r = client.get("/metrics")
+
+    assert r.status_code == 200
+    assert r.history == [], "a redirect would leave the scrape URL empty"
+    assert "predictions_total" in r.text

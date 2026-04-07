@@ -97,7 +97,7 @@ def load_model_and_info(stage: str | None = None) -> tuple[Any, dict]:
 
     invalidate_cache()
     try:
-        model = mlflow.sklearn.load_model(f"models:/{cfg.model_name}/{target_stage}")
+        model = mlflow.xgboost.load_model(f"models:/{cfg.model_name}/{target_stage}")
     except Exception as exc:
         raise ModelUnavailable(
             f"could not load {cfg.model_name}/{target_stage} v{info['version']}: {exc}"

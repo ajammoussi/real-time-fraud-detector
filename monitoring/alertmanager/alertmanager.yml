@@ -16,4 +16,6 @@ receivers:
         http_config:
           authorization:
             type: Bearer
-            credentials: ${ALERT_WEBHOOK_TOKEN}
+            # Alertmanager does not expand ${ENV} in its config; the compose
+            # entrypoint writes ALERT_WEBHOOK_TOKEN into this file at startup.
+            credentials_file: /tmp/alert_token

@@ -6,6 +6,11 @@ window end. Feast's `ttl` supplies the trailing window at retrieval time.
 
 `online=True` keeps the latest values in Redis for serving; historical
 retrieval reads the parquet files directly, so CI needs no Redis.
+
+The module is deliberately not named `features.py`: `feast apply` imports repo
+modules by module name, and the images put `/app` on PYTHONPATH, so a local
+`features.py` would be shadowed by the project's `features/` package — apply
+would then no-op and write an empty registry.
 """
 
 from __future__ import annotations

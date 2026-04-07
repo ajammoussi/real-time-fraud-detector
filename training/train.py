@@ -190,9 +190,12 @@ def train() -> str:
             )
             raise SystemExit(1)
 
-        info = mlflow.sklearn.log_model(
+        # XGBoost flavor: skops (mlflow.sklearn's default serializer) refuses
+        # XGBClassifier as an untrusted type, and the native UBJ format is the
+        # right artifact for an XGBClassifier anyway.
+        info = mlflow.xgboost.log_model(
             final_model,
-            artifact_path="model",
+            name="model",
             registered_model_name=cfg.model_name,
         )
         MlflowClient(cfg.mlflow_tracking_uri).set_model_version_tag(

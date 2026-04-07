@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 
 from config.params import get_params
-from datalake.storage import list_parquet, read_parquet_keys
+from datalake.storage import SEED_PREFIX, list_parquet, read_parquet_keys
 from features import store as feature_store
 from gx.validate import validate_frame
 from training.feature_engineering import engineer_features
@@ -39,7 +39,17 @@ DATASET_PATH = Path(__file__).resolve().parents[1] / "data" / "dataset.parquet"
 
 def _load_from_lake() -> pd.DataFrame:
     params = get_params()
-    keys = list_parquet("raw/")
+    # Labels only enter the lake through the seed path (README "Dataset &
+    # labels"); live Binance batches are unlabelled by design. Taking the
+    # newest N files blindly would drop the only labelled batch out of the
+    # window as soon as the producer starts writing.
+    keys = list_parquet(SEED_PREFIX)
+    if not keys:
+        log.warning(
+            "no labelled seed batch in the lake — falling back to raw/; "
+            "training will fail unless those batches carry labels"
+        )
+        keys = list_parquet("raw/")
     max_files = params.dataset.max_files
     if max_files > 0:
         keys = keys[-max_files:]

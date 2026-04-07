@@ -80,7 +80,8 @@ def _refresh_lag(consumer: KafkaConsumer) -> None:
     if not assignment:
         return
     end_offsets = consumer.end_offsets(assignment)
-    committed = consumer.committed(assignment)
+    # KafkaConsumer.committed() takes one TopicPartition, not an iterable.
+    committed = {tp: consumer.committed(tp) for tp in assignment}
     lag = sum(max(end_offsets[tp] - (committed.get(tp) or 0), 0) for tp in assignment)
     kafka_consumer_lag.set(lag)
 

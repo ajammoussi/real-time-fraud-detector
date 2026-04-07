@@ -5,6 +5,9 @@ export DOCKER_BUILDKIT=1
 
 COMPOSE_FILE=docker/docker-compose.yml
 COMPOSE=docker compose -f $(COMPOSE_FILE)
+# Host-side Python for `test`/`db-revision`. Override when the venv is not
+# activated, e.g. `make test PYTHON=.venv/Scripts/python.exe`.
+PYTHON ?= python
 
 setup:
 	pip install -r requirements/dev.txt
@@ -13,21 +16,8 @@ setup:
 
 ensure-mlflow-db:
 	@echo "==> Ensuring MLflow metadata database exists (idempotent)..."
-	@$(COMPOSE) exec -T postgres sh -ec '
-	for i in $$(seq 1 20); do
-	  if psql -U mlops -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='"'"'mlflow'"'"';" | grep -q 1; then
-	    echo "mlflow database already exists.";
-	    exit 0;
-	  fi;
-	  if psql -U mlops -d postgres -c "CREATE DATABASE mlflow;" >/dev/null 2>&1; then
-	    echo "Created mlflow database.";
-	    exit 0;
-	  fi;
-	  echo "mlflow database not ready yet, retry $$i/20...";
-	  sleep 2;
-	done;
-	echo "Failed to ensure mlflow database after retries.";
-	exit 1'
+	@$(COMPOSE) exec -T postgres psql -U mlops -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='mlflow'" | grep -q 1 \
+		|| $(COMPOSE) exec -T postgres psql -U mlops -d postgres -c "CREATE DATABASE mlflow"
 
 infra-up:
 	@echo "==> [1/6] Starting core infrastructure services..."
@@ -60,8 +50,10 @@ seed:
 	$(COMPOSE) run --rm trainer python scripts/ingestion_ctl.py seed --n-rows 3000
 
 # 2. Velocity features → Feast offline store, and the online store for serving
+#    The post-apply check fails loudly if `feast apply` registered nothing
+#    (e.g. the definitions module was shadowed by another `features` module).
 features:
-	$(COMPOSE) run --rm features sh -c "python features/compute.py && cd feature_repo && feast apply && feast materialize-incremental $$(date -u +%Y-%m-%dT%H:%M:%S)"
+	$(COMPOSE) run --rm features sh -c "python features/compute.py && cd feature_repo && feast apply && feast feature-views list | grep -q user_stats && feast materialize-incremental $$(date -u +%Y-%m-%dT%H:%M:%S)"
 
 # 3. Validated, featured training set
 data:
@@ -92,7 +84,7 @@ ensure-model:
 	fi
 
 test:
-	pytest tests/unit tests/integration -v
+	$(PYTHON) -m pytest tests/unit tests/integration -v
 
 serve:
 	@echo "fraud-api is served by Docker at http://localhost:8000"
@@ -118,7 +110,7 @@ clean:
 	@echo "Project containers, images, and volumes cleaned."
 
 db-revision:
-	alembic revision --autogenerate -m "init"
+	$(PYTHON) -m alembic revision --autogenerate -m "init"
 
 db-upgrade:
 	@$(COMPOSE) exec -T postgres sh -c 'until pg_isready -U mlops -d mlops >/dev/null 2>&1; do echo "postgres not ready yet..."; sleep 2; done'

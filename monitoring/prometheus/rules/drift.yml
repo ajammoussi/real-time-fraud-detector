@@ -10,15 +10,20 @@ groups:
           summary: "Model input drift detected (drifted share={{ $value }})"
 
       - alert: HighPredictionLatency
-        expr: histogram_quantile(0.99, sum(rate(prediction_latency_seconds_bucket[5m])) by (le)) > 0.1
+        # Observed p99 on this stack is ~160ms (first call includes a registry
+        # refresh); 500ms is ~3x normal, so the rule stays quiet when healthy.
+        expr: histogram_quantile(0.99, sum(rate(prediction_latency_seconds_bucket[5m])) by (le)) > 0.5
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "p99 prediction latency > 100ms"
+          summary: "p99 prediction latency > 500ms ({{ $value }}s)"
 
       - alert: NoPredictions
-        expr: sum(rate(predictions_total[15m])) == 0
+        # `or absent(...)` covers the case the rule exists for: the API is gone,
+        # so the counter disappears and `sum(rate(...)) == 0` would silently
+        # return no data instead of firing.
+        expr: sum(rate(predictions_total[15m])) == 0 or absent(predictions_total)
         for: 30m
         labels:
           severity: critical

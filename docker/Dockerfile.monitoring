@@ -2,8 +2,10 @@
 FROM python:3.11-slim AS builder
 WORKDIR /build
 COPY requirements/monitoring.txt requirements/monitoring.txt
+# Cache the wheels: without it every rebuild re-downloads ~1GB and any PyPI
+# hiccup fails the build (the earlier --no-cache-dir defeated the mount).
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --prefix=/install -r requirements/monitoring.txt
+    pip install --timeout 120 --retries 5 --prefix=/install -r requirements/monitoring.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────
 FROM python:3.11-slim

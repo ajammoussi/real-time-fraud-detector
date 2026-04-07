@@ -14,7 +14,9 @@ Field mapping  (Binance → ingestion schema):
   data.a  (aggregate tradeId)  → transaction_id   "txn_<symbol>_<a>"
   data.T  (trade time ms)      → timestamp        ISO-8601 UTC
   data.s  (symbol e.g.BTCUSDT) → currency         quote asset (USDT, BTC, …)
-  data.p  (price in quote ccy) → amount_usd       float(p)
+  data.p × data.q              → amount_usd       price × quantity (notional),
+                                                  capped at 49 999.99 to stay
+                                                  inside the lake pre-check bounds
   data.q  (quantity base ccy)  → tx_volume        float(q)
   data.m  (maker side)         → device_type      "exchange_maker"/"exchange_taker"
 

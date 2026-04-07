@@ -24,8 +24,8 @@ if config.config_file_name is not None:
 # Load project settings
 cfg = get_settings()
 
-# Set SQLAlchemy URL from project settings
-config.set_main_option("sqlalchemy.url", cfg.postgres_dsn)
+# Set SQLAlchemy URL from project settings (driver pinned to psycopg2)
+config.set_main_option("sqlalchemy.url", cfg.postgres_sqlalchemy_url)
 
 target_metadata = ModelsBase.metadata
 

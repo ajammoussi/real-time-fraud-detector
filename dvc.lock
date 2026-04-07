@@ -1,0 +1,83 @@
+schema: '2.0'
+stages:
+  build_dataset:
+    cmd: python training/build_dataset.py
+    deps:
+    - path: datalake/storage.py
+      hash: md5
+      md5: 58e105717efb9618e7601705357c54b1
+      size: 4637
+      isexec: true
+    - path: features/schema.py
+      hash: md5
+      md5: ca73df25a6418c6a21cf192c6e1efd1d
+      size: 521
+      isexec: true
+    - path: features/store.py
+      hash: md5
+      md5: a62e9ada3a649c1f322ec4f9a6fd9e67
+      size: 2831
+      isexec: true
+    - path: gx/expectations/fraud_transactions_suite.json
+      hash: md5
+      md5: ad2ef441febdab69a632b87cdf127216
+      size: 1224
+      isexec: true
+    - path: gx/validate.py
+      hash: md5
+      md5: 9ed945dc4258b2a349ea271afdc9b421
+      size: 3879
+      isexec: true
+    - path: training/build_dataset.py
+      hash: md5
+      md5: 5c47faae366b8f0ce6019367189b8317
+      size: 4202
+      isexec: true
+    - path: training/feature_engineering.py
+      hash: md5
+      md5: 911680f4fede915e8069b570136b8b7e
+      size: 3297
+      isexec: true
+    params:
+      params.yaml:
+        dataset.max_files: 20
+        dataset.max_rows: 250000
+        dataset.min_labeled_rows: 500
+    outs:
+    - path: data/dataset.parquet
+      hash: md5
+      md5: 9fdd2d9e74ec543a3997586638cb17da
+      size: 73257
+  train:
+    cmd: python training/train.py
+    deps:
+    - path: data/dataset.parquet
+      hash: md5
+      md5: 9fdd2d9e74ec543a3997586638cb17da
+      size: 73257
+    - path: training/feature_engineering.py
+      hash: md5
+      md5: 911680f4fede915e8069b570136b8b7e
+      size: 3297
+      isexec: true
+    - path: training/train.py
+      hash: md5
+      md5: 19f0d8ce44af8f477b7f22ee7d94cdda
+      size: 8160
+      isexec: true
+    params:
+      params.yaml:
+        model.early_stopping_rounds: 30
+        model.learning_rate_max: 0.2
+        model.learning_rate_min: 0.005
+        model.max_depth_max: 8
+        model.min_auc: 0.75
+        model.min_avg_prec: 0.3
+        model.n_estimators_max: 400
+        model.n_estimators_min: 150
+        model.n_trials: 24
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 0ab4538fd4942b03f5d9ebc86893d944
+      size: 366

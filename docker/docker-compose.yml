@@ -84,7 +84,9 @@ services:
     ports: ["5000:5000"]
     restart: always
     environment:
-      MLFLOW_BACKEND_STORE_URI: postgresql://mlops:mlops_secret@postgres/mlflow
+      # Explicit psycopg2 driver: a bare postgresql:// makes SQLAlchemy 2.0
+      # pick psycopg (v3), which is not installed in the image.
+      MLFLOW_BACKEND_STORE_URI: postgresql+psycopg2://mlops:mlops_secret@postgres/mlflow
       MLFLOW_S3_ENDPOINT_URL: http://seaweedfs-s3:8333
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
@@ -191,9 +193,14 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
+    # Alertmanager has no --config.expand-env flag and does not expand ${VARS}
+    # in its config, so the bearer token is materialised into a file the config
+    # reads via credentials_file. (Verified against v0.27/v0.28/v0.29.)
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--config.expand-env"
+      - >-
+        printf '%s' "$$ALERT_WEBHOOK_TOKEN" > /tmp/alert_token
+        && exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml
     volumes:
       - ../monitoring/alertmanager:/etc/alertmanager
     env_file: [../.env]

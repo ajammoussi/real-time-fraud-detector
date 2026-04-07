@@ -32,10 +32,20 @@ class Settings(BaseSettings):
 
     @property
     def postgres_dsn(self) -> str:
+        """libpq DSN for psycopg2 (`psycopg2.connect`, drift, prediction writer)."""
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def postgres_sqlalchemy_url(self) -> str:
+        """SQLAlchemy URL for Alembic.
+
+        The driver is pinned: a bare `postgresql://` lets SQLAlchemy choose
+        psycopg (v3) on recent versions, which the images do not install.
+        """
+        return self.postgres_dsn.replace("postgresql://", "postgresql+psycopg2://", 1)
 
     # Kafka
     kafka_bootstrap_servers: str = "localhost:9092"

@@ -7,9 +7,9 @@ import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import make_asgi_app
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from api.routers import ingest_status, predict
 
@@ -47,8 +47,15 @@ app.add_middleware(
 app.include_router(predict.router)
 app.include_router(ingest_status.router)
 
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
+
+@app.get("/metrics")
+def metrics() -> Response:
+    """Prometheus scrape endpoint (no trailing-slash redirect).
+
+    The API runs a single uvicorn worker on purpose: each worker owns its own
+    registry, so multiple workers make every counter flap between processes.
+    """
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/health")

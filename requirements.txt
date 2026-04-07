@@ -2,7 +2,7 @@
 scikit-learn>=1.4
 xgboost>=2.0,<4
 optuna>=3.6
-pandas>=2.2
+pandas>=2.2,<3
 numpy>=1.26
 pyarrow>=21
 

@@ -6,10 +6,11 @@
 #
 # Steps:
 #   1. Ask the lake how many validated parquet files it holds.
-#   2. Seed synthetic labelled data — but ONLY when the lake is completely
-#      empty, so repeated retrains never re-seed a lake that has real rows.
+#   2. Seed synthetic labelled data — only when the lake holds no labelled
+#      batch yet, so repeated retrains never pile up duplicate seed files.
 #   3. Fail unless at least MIN_RAW_FILES files are present.
-#   4. Validate the newest raw batch against the Great Expectations suite.
+#   4. Validate the newest *labelled* raw batch against the Great Expectations
+#      suite (live feed batches are unlabelled, so they are skipped).
 #
 # Exits 0 if training can proceed, non-zero otherwise.
 set -euo pipefail
@@ -63,10 +64,20 @@ fi
 RAW_FILES=$(echo "$STATUS" | $PYTHON_BIN -c "import sys,json; print(json.load(sys.stdin)['lake_raw_files'])" 2>/dev/null || echo "0")
 RAW_FILES=$(echo "$RAW_FILES" | tr -d '[:space:]')
 
-if [ "$RAW_FILES" -eq 0 ] && [ "$SEED_IF_EMPTY" = "true" ]; then
-  echo "=== Lake is empty — writing synthetic labelled seed data ==="
+# Live batches never carry a label, so "the lake is empty" is the wrong
+# condition: once the producer has written anything, training still has no
+# labelled rows. Seed when there is no *labelled* batch yet.
+latest_labelled() {
+  $PYTHON_BIN scripts/ingestion_ctl.py latest --requires label | tr -d '\r'
+}
+
+LATEST=$(latest_labelled)
+
+if { [ "$RAW_FILES" -eq 0 ] || [ -z "$LATEST" ]; } && [ "$SEED_IF_EMPTY" = "true" ]; then
+  echo "=== No labelled training batch — writing synthetic labelled seed data ==="
   $PYTHON_BIN scripts/ingestion_ctl.py seed --n-rows 50000 --fraud-rate 0.02
   RAW_FILES=$(raw_file_count)
+  LATEST=$(latest_labelled)
 fi
 
 if ! echo "$RAW_FILES" | grep -E '^[0-9]+$' >/dev/null 2>&1; then
@@ -81,14 +92,16 @@ fi
 
 echo "=== Lake has $RAW_FILES raw parquet files — ready to train ==="
 
-echo "=== [2/2] Validating the newest raw batch with Great Expectations ==="
-LATEST=$($PYTHON_BIN scripts/ingestion_ctl.py latest)
-
+echo "=== [2/2] Validating the newest labelled raw batch with Great Expectations ==="
+# Live batches from the Binance feed carry no `label`; the suite is the
+# training-dataset contract, so only labelled batches can satisfy it.
 if [ -n "$LATEST" ]; then
   $PYTHON_BIN gx/validate.py "$LATEST"
   echo "GX validation passed: $LATEST"
 else
-  echo "WARNING: No parquet files found for GX validation — skipping."
+  echo "::error::No labelled raw batch in the lake — live feed batches are unlabelled by design." >&2
+  echo "::error::Run 'make seed' (or SEED_IF_EMPTY=true) to write a labelled bootstrap batch." >&2
+  exit 1
 fi
 
 echo "=== Ingestion pipeline ready — training can proceed ==="

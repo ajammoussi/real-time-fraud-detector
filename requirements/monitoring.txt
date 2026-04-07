@@ -1,7 +1,9 @@
 # Drift detection & alerting service
 evidently>=0.7,<0.8
 prometheus-client>=0.20
-pandas>=2.2
+# Evidently 0.7 imports pandas.core.dtypes.common.infer_dtype_from_object,
+# which pandas 3 removed — the upper bound is load-bearing, not cosmetic.
+pandas>=2.2,<3
 numpy>=1.26
 pyarrow>=21
 

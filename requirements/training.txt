@@ -2,7 +2,7 @@
 scikit-learn>=1.4
 xgboost>=2.0,<4
 optuna>=3.6
-pandas>=2.2
+pandas>=2.2,<3
 numpy>=1.26
 pyarrow>=21
 
@@ -14,7 +14,7 @@ mlflow>=3.0,<4
 dvc[s3]>=3.50,<4
 
 # Feature store
-feast[redis]>=0.61,<0.70
+feast[redis]>=0.68,<0.70
 
 # Data lake (S3-compatible)
 boto3>=1.34

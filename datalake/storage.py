@@ -18,10 +18,11 @@ from datetime import datetime, timezone
 
 import boto3
 import pandas as pd
+import pyarrow.parquet as pq
 
 from config.settings import get_settings
 
-_SEED_PREFIX = "raw/seed_"
+SEED_PREFIX = "raw/seed_"
 
 
 def s3_client():
@@ -50,6 +51,15 @@ def _objects(prefix: str) -> list[dict]:
 def list_parquet(prefix: str) -> list[str]:
     """Return the parquet keys under *prefix*, newest last."""
     return [o["Key"] for o in _objects(prefix) if o["Key"].endswith(".parquet")]
+
+
+def parquet_columns(key: str) -> list[str]:
+    """Column names at *key*, read from the parquet footer only (no full download)."""
+    cfg = get_settings()
+    body = (
+        s3_client().get_object(Bucket=cfg.datalake_bucket, Key=_normalise_key(key))["Body"].read()
+    )
+    return list(pq.read_schema(io.BytesIO(body)).names)
 
 
 def _normalise_key(key: str) -> str:
@@ -112,7 +122,7 @@ def lake_status() -> dict:
     return {
         "lake_raw_files": len(raw_parquet),
         "lake_raw_size_mb": round(sum(o["Size"] for o in raw_parquet) / 1_048_576, 2),
-        "seed_files": sum(1 for o in raw_parquet if o["Key"].startswith(_SEED_PREFIX)),
+        "seed_files": sum(1 for o in raw_parquet if o["Key"].startswith(SEED_PREFIX)),
         "quarantine_files": sum(1 for o in quarantine if o["Key"].endswith(".parquet")),
         "last_raw_write": (
             last_write.astimezone(timezone.utc).isoformat()
