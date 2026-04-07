@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+WORKDIR /app
+# gradio and httpx are pure-Python wheels: no compiler or libpq needed.
+RUN pip install --no-cache-dir gradio httpx
+COPY app.py app.py
+ENV PYTHONPATH=/app
+EXPOSE 7860
+CMD ["python","app.py"]

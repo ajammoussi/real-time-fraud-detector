@@ -1,0 +1,26 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+*.egg-info/
+dist/
+build/
+data/raw/
+data/validated/
+data/features/
+data/dataset.parquet
+metrics.json
+feature_repo/registry.db
+mlruns/
+.dvc/tmp/
+*.parquet
+/tmp/
+.venv/
+
+# Coverage outputs
+.coverage
+coverage.xml
+htmlcov/
+tests/coverage/
