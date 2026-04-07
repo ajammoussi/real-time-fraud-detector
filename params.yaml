@@ -1,0 +1,15 @@
+model:
+  n_trials: 24
+  n_estimators_min: 150
+  n_estimators_max: 400
+  max_depth_max: 8
+  learning_rate_min: 0.005
+  learning_rate_max: 0.2
+  early_stopping_rounds: 30
+  min_auc: 0.75
+  min_avg_prec: 0.30
+
+dataset:
+  max_files: 20
+  max_rows: 250000
+  min_labeled_rows: 500

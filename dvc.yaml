@@ -1,0 +1,39 @@
+stages:
+  build_dataset:
+    cmd: python training/build_dataset.py
+    deps:
+      - training/build_dataset.py
+      - training/feature_engineering.py
+      - features/store.py
+      - features/schema.py
+      - datalake/storage.py
+      - gx/validate.py
+      - gx/expectations/fraud_transactions_suite.json
+    params:
+      - params.yaml:
+          - dataset.max_files
+          - dataset.max_rows
+          - dataset.min_labeled_rows
+    outs:
+      - data/dataset.parquet
+
+  train:
+    cmd: python training/train.py
+    deps:
+      - training/train.py
+      - training/feature_engineering.py
+      - data/dataset.parquet
+    params:
+      - params.yaml:
+          - model.n_trials
+          - model.n_estimators_min
+          - model.n_estimators_max
+          - model.max_depth_max
+          - model.learning_rate_min
+          - model.learning_rate_max
+          - model.early_stopping_rounds
+          - model.min_auc
+          - model.min_avg_prec
+    metrics:
+      - metrics.json:
+          cache: false
