@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements/dev.txt
+      - run: pip install pre-commit
+      - name: Run pre-commit (lint + format)
+        run: pre-commit run --all-files --show-diff-on-failure
+      - name: Run unit tests with coverage
+        run: |
+          mkdir -p tests/coverage
+          pytest tests/unit -v --cov \
+            --cov-report=xml:tests/coverage/coverage.xml \
+            --cov-report=html:tests/coverage/html
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: tests/coverage/coverage.xml
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f docker/Dockerfile.api -t fraud-api:ci .
+      - run: docker run --rm fraud-api:ci python -c "import api.main; print('OK')"

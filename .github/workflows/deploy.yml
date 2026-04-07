@@ -1,0 +1,21 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [Train Pipeline]
+    types: [completed]
+
+jobs:
+  deploy-render:
+    # RENDER_DEPLOY=true enables this; unset disables Render deploys entirely.
+    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.RENDER_DEPLOY == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger Render deploy
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
+            -H "Content-Type: application/json" \
+            -d '{}'

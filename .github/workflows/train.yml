@@ -1,0 +1,29 @@
+name: Train & Promote
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "training/**"
+      - "features/**"
+      - "feature_repo/**"
+      - "ingestion/**"
+      - "gx/**"
+      - "scripts/**"
+      - "params.yaml"
+      - "dvc.yaml"
+      - "requirements*.txt"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Trigger reason"
+        required: false
+        default: "manual"
+
+jobs:
+  train:
+    uses: ./.github/workflows/_train.yml
+    with:
+      stage: Staging
+      reason: ${{ github.event.inputs.reason || 'push' }}
+    secrets: inherit

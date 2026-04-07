@@ -1,0 +1,28 @@
+name: Auto Retrain
+
+# Retraining switch
+# ----------------
+# Set the repository variable AUTO_RETRAIN_ENABLED=true to enable the weekly
+# scheduled retrain; unset (the default) makes the scheduled run skip and send
+# no email. Manual dispatches — and the drift webhook's dispatch — always run.
+#
+# Set it at: Settings → Secrets and variables → Actions → Variables.
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Alert that triggered retrain (e.g. FraudDriftHigh)"
+        required: true
+        default: "FraudDriftHigh"
+
+jobs:
+  retrain:
+    if: github.event_name == 'workflow_dispatch' || vars.AUTO_RETRAIN_ENABLED == 'true'
+    uses: ./.github/workflows/_train.yml
+    with:
+      stage: Production
+      reason: ${{ github.event.inputs.reason || 'scheduled' }}
+    secrets: inherit

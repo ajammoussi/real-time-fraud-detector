@@ -1,0 +1,91 @@
+name: Train Pipeline
+
+# The single training pipeline. Both train.yml (Staging) and retrain.yml
+# (Production) call this, so the two paths can no longer drift apart.
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: "MLflow stage to promote the trained model into"
+        required: false
+        type: string
+        default: Staging
+      reason:
+        description: "Why this run was triggered"
+        required: false
+        type: string
+        default: manual
+
+timeout-minutes: 45
+
+concurrency:
+  group: train-pipeline
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_S3_ENDPOINT_URL: http://localhost:9000
+      SEAWEED_ENDPOINT: "${{ secrets.SEAWEED_ENDPOINT || 'http://localhost:9000' }}"
+      SEAWEED_ACCESS_KEY: "${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}"
+      SEAWEED_SECRET_KEY: "${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}"
+      DATALAKE_BUCKET: "${{ secrets.DATALAKE_BUCKET || 'datalake' }}"
+      PYTHONPATH: "${{ github.workspace }}"
+      AWS_ACCESS_KEY_ID: "${{ secrets.SEAWEED_ACCESS_KEY || 'minioadmin' }}"
+      AWS_SECRET_ACCESS_KEY: "${{ secrets.SEAWEED_SECRET_KEY || 'minioadmin' }}"
+      AWS_DEFAULT_REGION: "us-east-1"
+    services:
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: "${{ secrets.CI_MINIO_ROOT_USER || 'minioadmin' }}"
+          MINIO_ROOT_PASSWORD: "${{ secrets.CI_MINIO_ROOT_PASSWORD || 'minioadmin' }}"
+        ports:
+          - 9000:9000
+          - 9001:9001
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+        command: server /data --console-address :9001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements/dev.txt
+
+      - name: Wait for local S3 and create bucket
+        run: PYTHONPATH="$PWD" python scripts/wait_for_s3.py --timeout 60 --create-bucket
+
+      - name: Check lake and seed if empty
+        run: |
+          echo "Train pipeline triggered by: ${{ inputs.reason }} (stage: ${{ inputs.stage }})"
+          bash scripts/pipeline_gate.sh
+        env:
+          MIN_RAW_FILES: "1"
+          SEED_IF_EMPTY: "true"   # bootstrap only when the lake is empty
+
+      - name: Compute velocity features
+        run: python features/compute.py
+
+      - name: Apply Feast definitions
+        # No materialize step: CI has no Redis, and training only needs the
+        # offline store behind feature_repo/registry.db.
+        run: cd feature_repo && feast apply
+
+      - name: Build dataset and train
+        id: train
+        run: |
+          dvc repro
+          RUN_ID=$(python -c "import json;print(json.load(open('metrics.json'))['run_id'])")
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Promote the registered version
+        run: |
+          python scripts/model_ctl.py promote \
+            --run-id "${{ steps.train.outputs.run_id }}" \
+            --stage "${{ inputs.stage }}"
