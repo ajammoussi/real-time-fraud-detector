@@ -1,6 +1,6 @@
 # Full ML training pipeline
 scikit-learn>=1.4
-xgboost>=2.0,<4
+xgboost-cpu>=2.0,<4    # same `xgboost` package, without the 336 MB NCCL dependency
 optuna>=3.6
 pandas>=2.2,<3
 numpy>=1.26
